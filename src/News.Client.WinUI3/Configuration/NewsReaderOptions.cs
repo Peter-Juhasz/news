@@ -4,5 +4,5 @@ public sealed class NewsReaderOptions
 {
     public const string SectionName = "News";
 
-    public string GroupsPath { get; set; } = "groups";
+    public string GroupsFilePath { get; set; } = "groups.yml";
 }

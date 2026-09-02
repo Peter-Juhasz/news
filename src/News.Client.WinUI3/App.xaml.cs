@@ -50,7 +50,7 @@ public partial class App : Application
         builder.Services.Configure<NewsReaderOptions>(builder.Configuration.GetSection(NewsReaderOptions.SectionName));
         builder.Services.AddSingleton<MainViewModel>();
         builder.Services.AddSingleton<MainWindow>();
-        builder.Services.AddSingleton<GroupFileLoader>();
+        builder.Services.AddSingleton<GroupsFileLoader>();
         builder.Services.AddSingleton<IGroupCatalog, GroupCatalog>();
         builder.Services.AddSingleton<INewsSourceClient, NewsSourceClient>();
 

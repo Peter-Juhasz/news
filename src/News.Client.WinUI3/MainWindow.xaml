@@ -190,6 +190,11 @@
                                                 Text="{x:Bind Lead}"
                                                 TextTrimming="CharacterEllipsis"
                                                 TextWrapping="Wrap" />
+                                            <TextBlock
+                                                Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                                Style="{StaticResource CaptionTextBlockStyle}"
+                                                Text="{x:Bind ViewsText}"
+                                                Visibility="{x:Bind HasViews}" />
                                         </StackPanel>
 
                                         <TextBlock

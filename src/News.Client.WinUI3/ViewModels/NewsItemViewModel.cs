@@ -23,6 +23,8 @@ public sealed class NewsItemViewModel(NewsItem item, NewsSource source)
 
     public string? Content { get; } = item.Content;
 
+    public long? Views { get; } = item.Views;
+
     /// <summary>
     /// Name configured on the source, shown instead of the article's host name.
     /// </summary>
@@ -35,9 +37,21 @@ public sealed class NewsItemViewModel(NewsItem item, NewsSource source)
 
     public bool HasImage => ImageUri is not null;
 
+    public bool HasViews => Views is not null;
+
+    public string ViewsText => Views is { } views ? $"{FormatCount(views)} views" : string.Empty;
+
     public string TimeText => Date.ToLocalTime().ToString("HH:mm");
 
     public string PlainContent => HtmlUtility.ToPlainText(Content);
 
     public string? HtmlContent => HtmlUtility.LooksLikeHtml(Content) ? Content : null;
+
+    private static string FormatCount(long value) => value switch
+    {
+        >= 1_000_000_000 => $"{value / 1_000_000_000d:0.#}B",
+        >= 1_000_000 => $"{value / 1_000_000d:0.#}M",
+        >= 10_000 => $"{value / 1_000d:0.#}K",
+        _ => value.ToString("N0")
+    };
 }

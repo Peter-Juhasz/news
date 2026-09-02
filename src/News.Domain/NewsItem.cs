@@ -7,4 +7,5 @@ public sealed record NewsItem(
     string Lead,
     string Url,
     string? ImageUrl = null,
-    string? Content = null);
+    string? Content = null,
+    long? Views = null);

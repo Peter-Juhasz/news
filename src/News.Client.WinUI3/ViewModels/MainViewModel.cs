@@ -78,9 +78,12 @@ public sealed partial class MainViewModel : ObservableObject
 
     public string SelectedSource => SelectedItem?.SourceTitle ?? SelectedUrlUri?.Host ?? string.Empty;
 
-    public string SelectedByline => string.IsNullOrEmpty(SelectedSource)
-        ? SelectedDateTimeText
-        : $"{SelectedSource} · {SelectedDateTimeText}";
+    public string SelectedViewsText => SelectedItem?.ViewsText ?? string.Empty;
+
+    public string SelectedByline => string.Join(
+        " · ",
+        new[] { SelectedSource, SelectedDateTimeText, SelectedViewsText }
+            .Where(part => !string.IsNullOrEmpty(part)));
 
     public string SelectedUrl => SelectedItem?.Url ?? string.Empty;
 
@@ -318,11 +321,7 @@ public sealed partial class MainViewModel : ObservableObject
             return preferred;
         }
 
-        return HasWebContent
-            ? NewsContentMode.Web
-            : HasPlainContent
-                ? NewsContentMode.Text
-                : NewsContentMode.Html;
+        return NewsContentMode.Text;
     }
 
     partial void OnSelectedContentModeChanged(NewsContentMode value)
@@ -346,6 +345,7 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(SelectedTitle));
         OnPropertyChanged(nameof(SelectedDateTimeText));
         OnPropertyChanged(nameof(SelectedSource));
+        OnPropertyChanged(nameof(SelectedViewsText));
         OnPropertyChanged(nameof(SelectedByline));
         OnPropertyChanged(nameof(SelectedUrl));
         OnPropertyChanged(nameof(SelectedUrlUri));

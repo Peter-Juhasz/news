@@ -3,7 +3,7 @@ using News.Domain;
 
 namespace News.Client.WinUI3.ViewModels;
 
-public sealed class NewsItemViewModel(NewsItem item)
+public sealed class NewsItemViewModel(NewsItem item, NewsSource source)
 {
     public string? Id { get; } = item.Id;
 
@@ -22,6 +22,16 @@ public sealed class NewsItemViewModel(NewsItem item)
     public Uri? ImageUri { get; } = Uri.TryCreate(item.ImageUrl, UriKind.Absolute, out var imageUri) ? imageUri : null;
 
     public string? Content { get; } = item.Content;
+
+    /// <summary>
+    /// Name configured on the source, shown instead of the article's host name.
+    /// </summary>
+    public string? SourceTitle { get; } = source.Title;
+
+    /// <summary>
+    /// View this item's source prefers when the item is selected.
+    /// </summary>
+    public NewsContentMode? DefaultView { get; } = source.DefaultView;
 
     public bool HasImage => ImageUri is not null;
 

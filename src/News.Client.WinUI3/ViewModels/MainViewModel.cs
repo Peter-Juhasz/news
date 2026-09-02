@@ -5,6 +5,7 @@ using News.Client.WinUI3.Groups;
 using News.Client.WinUI3.Services;
 using News.Domain;
 using System.Collections.ObjectModel;
+using Windows.ApplicationModel.DataTransfer;
 using Windows.System;
 
 namespace News.Client.WinUI3.ViewModels;
@@ -33,6 +34,14 @@ public sealed partial class MainViewModel : ObservableObject
         OpenSelectedArticleCommand = new AsyncRelayCommand(
             execute: OpenSelectedArticleAsync,
             canExecute: () => CanOpenSelected);
+
+        CopySelectedAsTextCommand = new RelayCommand(
+            execute: CopySelectedAsText,
+            canExecute: () => HasSelection);
+
+        CopySelectedUrlCommand = new RelayCommand(
+            execute: CopySelectedUrl,
+            canExecute: () => CanOpenSelected);
     }
 
     public ObservableCollection<NewsGroupViewModel> Groups { get; } = [];
@@ -42,6 +51,10 @@ public sealed partial class MainViewModel : ObservableObject
     public IAsyncRelayCommand RefreshSelectedGroupCommand { get; }
 
     public IAsyncRelayCommand OpenSelectedArticleCommand { get; }
+
+    public IRelayCommand CopySelectedAsTextCommand { get; }
+
+    public IRelayCommand CopySelectedUrlCommand { get; }
 
     [ObservableProperty]
     public partial NewsGroupViewModel? SelectedGroup { get; set; }
@@ -63,7 +76,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     public string SelectedDateTimeText => SelectedItem?.Date.ToLocalTime().ToString("f") ?? string.Empty;
 
-    public string SelectedSource => SelectedUrlUri?.Host ?? string.Empty;
+    public string SelectedSource => SelectedItem?.SourceTitle ?? SelectedUrlUri?.Host ?? string.Empty;
 
     public string SelectedByline => string.IsNullOrEmpty(SelectedSource)
         ? SelectedDateTimeText
@@ -81,11 +94,16 @@ public sealed partial class MainViewModel : ObservableObject
 
     public bool HasHtmlContent => !string.IsNullOrWhiteSpace(SelectedHtmlContent);
 
-    public bool HasBothContentModes => HasPlainContent && HasHtmlContent;
+    public bool HasWebContent => SelectedUrlUri is not null;
+
+    public bool HasMultipleContentModes =>
+        (HasPlainContent ? 1 : 0) + (HasHtmlContent ? 1 : 0) + (HasWebContent ? 1 : 0) > 1;
 
     public bool IsTextContentMode => HasSelection && SelectedContentMode == NewsContentMode.Text;
 
     public bool IsHtmlContentMode => HasSelection && SelectedContentMode == NewsContentMode.Html && HasHtmlContent;
+
+    public bool IsWebContentMode => HasSelection && SelectedContentMode == NewsContentMode.Web && HasWebContent;
 
     public bool CanOpenSelected => SelectedUrlUri is not null;
 
@@ -101,10 +119,8 @@ public sealed partial class MainViewModel : ObservableObject
         ApplyGroups(_groupCatalog.CurrentGroups);
         _initialized = true;
 
-        if (Groups.Count > 0)
-        {
-            await SelectGroupAsync(Groups[0], cancellationToken);
-        }
+        // Sources are not fetched here: the view navigates to the first group once it is
+        // loaded, and every group fetches on its first navigation instead.
     }
 
     public async Task SelectGroupAsync(NewsGroupViewModel group, CancellationToken cancellationToken = default)
@@ -126,18 +142,21 @@ public sealed partial class MainViewModel : ObservableObject
 
     public void SetContentMode(NewsContentMode mode)
     {
-        if (mode == NewsContentMode.Html && !HasHtmlContent)
-        {
-            return;
-        }
-
-        if (mode == NewsContentMode.Text && !HasPlainContent)
+        if (!IsContentModeAvailable(mode))
         {
             return;
         }
 
         SelectedContentMode = mode;
     }
+
+    private bool IsContentModeAvailable(NewsContentMode mode) => mode switch
+    {
+        NewsContentMode.Text => HasPlainContent,
+        NewsContentMode.Html => HasHtmlContent,
+        NewsContentMode.Web => HasWebContent,
+        _ => false
+    };
 
     private async Task RefreshSelectedGroupAsync()
     {
@@ -168,6 +187,40 @@ public sealed partial class MainViewModel : ObservableObject
         }
 
         await Launcher.LaunchUriAsync(SelectedUrlUri);
+    }
+
+    private void CopySelectedAsText()
+    {
+        if (SelectedItem is not { } item)
+        {
+            return;
+        }
+
+        var lines = new[] { item.Title, item.Url, SelectedDateTimeText, item.Lead }
+            .Where(line => !string.IsNullOrWhiteSpace(line));
+
+        SetClipboardText(string.Join(Environment.NewLine, lines));
+    }
+
+    private void CopySelectedUrl()
+    {
+        if (SelectedUrlUri is null)
+        {
+            return;
+        }
+
+        SetClipboardText(SelectedUrl);
+    }
+
+    private static void SetClipboardText(string text)
+    {
+        var package = new DataPackage
+        {
+            RequestedOperation = DataPackageOperation.Copy
+        };
+
+        package.SetText(text);
+        Clipboard.SetContent(package);
     }
 
     private void OnGroupsChanged(object? sender, IReadOnlyList<NewsGroup> groups)
@@ -210,11 +263,11 @@ public sealed partial class MainViewModel : ObservableObject
         RefreshSelectedGroupCommand.NotifyCanExecuteChanged();
     }
 
-    private void RebuildDayGroups(IReadOnlyList<NewsItem> items)
+    private void RebuildDayGroups(IReadOnlyList<SourcedNewsItem> items)
     {
         var selectedUrl = SelectedItem?.Url;
         var groupedItems = items
-            .Select(item => new NewsItemViewModel(item))
+            .Select(entry => new NewsItemViewModel(entry.Item, entry.Source))
             .GroupBy(item => DateOnly.FromDateTime(item.Date.LocalDateTime.Date))
             .OrderByDescending(group => group.Key);
 
@@ -243,14 +296,30 @@ public sealed partial class MainViewModel : ObservableObject
 
     partial void OnSelectedItemChanged(NewsItemViewModel? value)
     {
-        SelectedContentMode = HasPlainContent ? NewsContentMode.Text : NewsContentMode.Html;
+        SelectedContentMode = ResolveInitialContentMode(value);
         RaiseSelectedItemPresentationPropertiesChanged();
+    }
+
+    private NewsContentMode ResolveInitialContentMode(NewsItemViewModel? item)
+    {
+        // The source's preferred view wins whenever this item can actually show it.
+        if (item?.DefaultView is { } preferred && IsContentModeAvailable(preferred))
+        {
+            return preferred;
+        }
+
+        return HasWebContent
+            ? NewsContentMode.Web
+            : HasPlainContent
+                ? NewsContentMode.Text
+                : NewsContentMode.Html;
     }
 
     partial void OnSelectedContentModeChanged(NewsContentMode value)
     {
         OnPropertyChanged(nameof(IsTextContentMode));
         OnPropertyChanged(nameof(IsHtmlContentMode));
+        OnPropertyChanged(nameof(IsWebContentMode));
     }
 
     partial void OnIsBusyChanged(bool value)
@@ -272,10 +341,14 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(SelectedHtmlContent));
         OnPropertyChanged(nameof(HasPlainContent));
         OnPropertyChanged(nameof(HasHtmlContent));
-        OnPropertyChanged(nameof(HasBothContentModes));
+        OnPropertyChanged(nameof(HasWebContent));
+        OnPropertyChanged(nameof(HasMultipleContentModes));
         OnPropertyChanged(nameof(IsTextContentMode));
         OnPropertyChanged(nameof(IsHtmlContentMode));
+        OnPropertyChanged(nameof(IsWebContentMode));
         OnPropertyChanged(nameof(CanOpenSelected));
         OpenSelectedArticleCommand.NotifyCanExecuteChanged();
+        CopySelectedAsTextCommand.NotifyCanExecuteChanged();
+        CopySelectedUrlCommand.NotifyCanExecuteChanged();
     }
 }

@@ -38,17 +38,51 @@ public sealed class GroupFileLoader
             throw new InvalidDataException("Source frequency must be a positive timespan.");
         }
 
+        var title = string.IsNullOrWhiteSpace(source.Title) ? null : source.Title.Trim();
+        var defaultView = ParseDefaultView(source.DefaultView);
+
         return source.Type.Trim().ToLowerInvariant() switch
         {
             "rss" => new RssNewsSource(
                 Url: RequireValue(source.Url, "url"),
-                Frequency: source.Frequency),
+                Frequency: source.Frequency)
+            {
+                Title = title,
+                DefaultView = defaultView
+            },
             "reddit" => new RedditNewsSource(
                 Subreddit: RequireValue(source.Subreddit, "subreddit"),
-                Frequency: source.Frequency),
+                Frequency: source.Frequency)
+            {
+                Title = title,
+                DefaultView = defaultView
+            },
+            "youtube" => new YouTubeNewsSource(
+                ChannelId: RequireValue(source.ChannelId, "channelId"),
+                Frequency: source.Frequency)
+            {
+                Title = title,
+                DefaultView = defaultView
+            },
             _ => throw new InvalidDataException(
-                $"Unsupported source type '{source.Type}'. Expected 'rss' or 'reddit'.")
+                $"Unsupported source type '{source.Type}'. Expected 'rss', 'reddit' or 'youtube'.")
         };
+    }
+
+    private static NewsContentMode? ParseDefaultView(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (!Enum.TryParse<NewsContentMode>(value.Trim(), ignoreCase: true, out var mode))
+        {
+            throw new InvalidDataException(
+                $"Unsupported default view '{value}'. Expected 'text', 'html' or 'web'.");
+        }
+
+        return mode;
     }
 
     private static string RequireValue(string? value, string fieldName)
@@ -77,5 +111,11 @@ public sealed class GroupFileLoader
         public string? Url { get; init; }
 
         public string? Subreddit { get; init; }
+
+        public string? ChannelId { get; init; }
+
+        public string? Title { get; init; }
+
+        public string? DefaultView { get; init; }
     }
 }

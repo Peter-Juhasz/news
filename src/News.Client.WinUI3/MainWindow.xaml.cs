@@ -1,15 +1,21 @@
 using Microsoft.UI.Composition.SystemBackdrops;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using News.Client.WinUI3.ViewModels;
+using News.Domain;
 
 namespace News.Client.WinUI3;
 
 public sealed partial class MainWindow : Window
 {
     private bool _isWebViewReady;
+    private bool _isBrowserWebViewReady;
     private bool _isSyncingNavigationSelection;
+    private bool _isSyncingListSelection;
+    private Uri? _browserNavigatedUri;
+    private NewsItemViewModel? _contextTargetItem;
 
     public MainWindow(MainViewModel viewModel)
     {
@@ -27,14 +33,15 @@ public sealed partial class MainWindow : Window
         await EnsureWebViewReadyAsync();
         await ViewModel.InitializeAsync();
 
+        SyncContentModeSelector();
+        UpdateWebViewContent();
+
+        // Selecting the first group raises SelectionChanged, which is what fetches its
+        // sources. Nothing is loaded until that first navigation happens.
         if (GroupsNavigationView.SelectedItem is null && ViewModel.Groups.Count > 0)
         {
             GroupsNavigationView.SelectedItem = ViewModel.Groups[0];
         }
-
-        SyncNavigationSelection();
-        SyncContentModeSelector();
-        UpdateWebViewContent();
     }
 
     private async void GroupsNavigationViewSelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
@@ -59,7 +66,57 @@ public sealed partial class MainWindow : Window
 
     private void NewsSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (_isSyncingListSelection)
+        {
+            return;
+        }
+
         ViewModel.SelectedItem = NewsListView.SelectedItem as NewsItemViewModel;
+    }
+
+    private void SyncListSelection()
+    {
+        var selectedItem = ViewModel.SelectedItem;
+        if (ReferenceEquals(NewsListView.SelectedItem, selectedItem))
+        {
+            return;
+        }
+
+        _isSyncingListSelection = true;
+        try
+        {
+            NewsListView.SelectedItem = selectedItem;
+        }
+        finally
+        {
+            _isSyncingListSelection = false;
+        }
+    }
+
+    private void NewsListViewRightTapped(object sender, RightTappedRoutedEventArgs e)
+    {
+        _contextTargetItem = (e.OriginalSource as FrameworkElement)?.DataContext as NewsItemViewModel;
+    }
+
+    private void CopyAsTextAcceleratorInvoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        args.Handled = true;
+
+        if (ViewModel.CopySelectedAsTextCommand.CanExecute(null))
+        {
+            ViewModel.CopySelectedAsTextCommand.Execute(null);
+        }
+    }
+
+    private void NewsContextFlyoutOpening(object? sender, object e)
+    {
+        // The menu acts on the selected item, so a right-tap on a different row moves the
+        // selection first. A keyboard-invoked menu has no target and keeps the selection.
+        if (_contextTargetItem is { } item)
+        {
+            NewsListView.SelectedItem = item;
+            _contextTargetItem = null;
+        }
     }
 
     private void ContentModeSelectorSelectionChanged(SelectorBar sender, SelectorBarSelectionChangedEventArgs args)
@@ -69,13 +126,10 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        if (string.Equals(selectedItem.Tag as string, "Html", StringComparison.OrdinalIgnoreCase))
+        if (Enum.TryParse<NewsContentMode>(selectedItem.Tag as string, ignoreCase: true, out var mode))
         {
-            ViewModel.SetContentMode(NewsContentMode.Html);
-            return;
+            ViewModel.SetContentMode(mode);
         }
-
-        ViewModel.SetContentMode(NewsContentMode.Text);
     }
 
     private void ViewModelOnPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -85,7 +139,12 @@ public sealed partial class MainWindow : Window
             SyncNavigationSelection();
         }
 
-        if (e.PropertyName is nameof(MainViewModel.SelectedContentMode) or nameof(MainViewModel.HasBothContentModes))
+        if (e.PropertyName is nameof(MainViewModel.SelectedItem))
+        {
+            SyncListSelection();
+        }
+
+        if (e.PropertyName is nameof(MainViewModel.SelectedContentMode) or nameof(MainViewModel.HasMultipleContentModes))
         {
             SyncContentModeSelector();
         }
@@ -93,6 +152,11 @@ public sealed partial class MainWindow : Window
         if (e.PropertyName is nameof(MainViewModel.SelectedHtmlContent) or nameof(MainViewModel.IsHtmlContentMode))
         {
             UpdateWebViewContent();
+        }
+
+        if (e.PropertyName is nameof(MainViewModel.SelectedUrlUri) or nameof(MainViewModel.IsWebContentMode))
+        {
+            UpdateBrowserContent();
         }
     }
 
@@ -117,9 +181,12 @@ public sealed partial class MainWindow : Window
 
     private void SyncContentModeSelector()
     {
-        ContentModeSelector.SelectedItem = ViewModel.SelectedContentMode == NewsContentMode.Html
-            ? HtmlModeSelectorItem
-            : TextModeSelectorItem;
+        ContentModeSelector.SelectedItem = ViewModel.SelectedContentMode switch
+        {
+            NewsContentMode.Html => HtmlModeSelectorItem,
+            NewsContentMode.Web => WebModeSelectorItem,
+            _ => TextModeSelectorItem
+        };
     }
 
     private void UpdateWebViewContent()
@@ -138,6 +205,38 @@ public sealed partial class MainWindow : Window
         ArticleWebView.NavigateToString(ViewModel.SelectedHtmlContent);
     }
 
+    private async void UpdateBrowserContent()
+    {
+        // The browser view is created on first use so startup does not pay for a second
+        // WebView2 environment that most sessions never open.
+        if (!ViewModel.IsWebContentMode)
+        {
+            return;
+        }
+
+        var targetUri = ViewModel.SelectedUrlUri;
+        if (targetUri is null || targetUri == _browserNavigatedUri)
+        {
+            return;
+        }
+
+        _browserNavigatedUri = targetUri;
+
+        if (!_isBrowserWebViewReady)
+        {
+            await BrowserWebView.EnsureCoreWebView2Async();
+            _isBrowserWebViewReady = true;
+
+            if (targetUri != _browserNavigatedUri)
+            {
+                // A newer request came in while the environment was being created.
+                return;
+            }
+        }
+
+        BrowserWebView.Source = targetUri;
+    }
+
     private void ConfigureWindowChrome()
     {
         Title = "News";
@@ -151,7 +250,9 @@ public sealed partial class MainWindow : Window
                 Kind = MicaKind.BaseAlt
             };
         }
-    }
+
+		AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico"));
+	}
 
     private async Task EnsureWebViewReadyAsync()
     {

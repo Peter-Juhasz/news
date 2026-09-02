@@ -10,6 +10,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>news</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
     
     <!-- Unpackaged (no MSIX): the app carries its own copy of the Windows App SDK runtime,
          so it runs on a machine where that runtime was never installed. -->
@@ -45,5 +46,6 @@
     <None Include=".env" Condition="Exists('.env')">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="Assets\AppIcon.ico" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

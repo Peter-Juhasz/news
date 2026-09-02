@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Media;
 using News.Client.WinUI3.Configuration;
 using News.Client.WinUI3.Groups;
 using News.Client.WinUI3.Services;
@@ -17,7 +18,10 @@ public partial class App : Application
     {
         InitializeComponent();
         _host = BuildHost();
-    }
+
+		// HACK: fix for sluggish UI on Windows 11, see https://github.com/microsoft/microsoft-ui-xaml/issues/11144
+		CompositionTarget.Rendering += (_, _) => { };
+	}
 
     protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {

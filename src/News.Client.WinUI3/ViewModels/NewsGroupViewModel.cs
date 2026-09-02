@@ -46,13 +46,13 @@ public sealed class NewsGroupViewModel(
         }
     }
 
-    public IReadOnlyList<NewsItem> GetMergedItems()
+    public IReadOnlyList<SourcedNewsItem> GetMergedItems()
     {
-        var merged = new Dictionary<string, NewsItem>(StringComparer.OrdinalIgnoreCase);
+        var merged = new Dictionary<string, SourcedNewsItem>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var cachedItems in _sourceStates.Values.Select(state => state.Items))
+        foreach (var (source, state) in _sourceStates)
         {
-            foreach (var item in cachedItems)
+            foreach (var item in state.Items)
             {
                 var key = string.IsNullOrWhiteSpace(item.Id) ? item.Url : item.Id;
                 if (key is null)
@@ -60,16 +60,16 @@ public sealed class NewsGroupViewModel(
                     continue;
                 }
 
-                if (!merged.TryGetValue(key, out var current) || item.Date > current.Date)
+                if (!merged.TryGetValue(key, out var current) || item.Date > current.Item.Date)
                 {
-                    merged[key] = item;
+                    merged[key] = new SourcedNewsItem(item, source);
                 }
             }
         }
 
         return merged
             .Values
-            .OrderByDescending(item => item.Date)
+            .OrderByDescending(entry => entry.Item.Date)
             .ToList();
     }
 

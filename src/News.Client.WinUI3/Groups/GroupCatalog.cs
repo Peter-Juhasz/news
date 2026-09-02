@@ -12,8 +12,6 @@ public sealed class GroupCatalog : IGroupCatalog, IDisposable
     private readonly ILogger<GroupCatalog> _logger;
     private readonly string _groupsPath;
     private readonly SemaphoreSlim _reloadLock = new(1, 1);
-    private readonly object _timerLock = new();
-    private readonly Timer _reloadTimer;
     private FileSystemWatcher? _watcher;
     private SynchronizationContext? _uiContext;
 
@@ -25,7 +23,6 @@ public sealed class GroupCatalog : IGroupCatalog, IDisposable
         _groupFileLoader = groupFileLoader;
         _logger = logger;
         _groupsPath = ResolveGroupsPath(options.Value.GroupsPath);
-        _reloadTimer = new Timer(static state => ((GroupCatalog)state!).ScheduleReloadAsync(), this, Timeout.Infinite, Timeout.Infinite);
     }
 
     public event EventHandler<IReadOnlyList<NewsGroup>>? GroupsChanged;
@@ -44,7 +41,6 @@ public sealed class GroupCatalog : IGroupCatalog, IDisposable
     public void Dispose()
     {
         _watcher?.Dispose();
-        _reloadTimer.Dispose();
         _reloadLock.Dispose();
     }
 
@@ -70,34 +66,7 @@ public sealed class GroupCatalog : IGroupCatalog, IDisposable
 
     private void OnGroupFilesChanged(object sender, FileSystemEventArgs eventArgs)
     {
-        lock (_timerLock)
-        {
-            _reloadTimer.Change(TimeSpan.FromMilliseconds(300), Timeout.InfiniteTimeSpan);
-        }
-    }
-
-    private async void ScheduleReloadAsync()
-    {
-        try
-        {
-            await ReloadAsync(CancellationToken.None);
-        }
-        catch (IOException exception)
-        {
-            _logger.LogWarning(exception, "Reload failed due to file access issue.");
-        }
-        catch (UnauthorizedAccessException exception)
-        {
-            _logger.LogWarning(exception, "Reload failed because the groups folder is inaccessible.");
-        }
-        catch (InvalidDataException exception)
-        {
-            _logger.LogWarning(exception, "Reload failed because a group file is invalid.");
-        }
-        catch (YamlException exception)
-        {
-            _logger.LogWarning(exception, "Reload failed because a group file is not valid YAML.");
-        }
+        // TODO: reload
     }
 
     private async Task ReloadAsync(CancellationToken cancellationToken)
@@ -156,8 +125,15 @@ public sealed class GroupCatalog : IGroupCatalog, IDisposable
         _uiContext.Post(_ => handler(this, CurrentGroups), null);
     }
 
-    private static string ResolveGroupsPath(string configuredPath) =>
-        Path.IsPathRooted(configuredPath)
-            ? configuredPath
-            : Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, configuredPath));
+	private static string ResolveGroupsPath(string configuredPath)
+	{
+        configuredPath = Environment.ExpandEnvironmentVariables(configuredPath);
+
+        if (Path.IsPathRooted(configuredPath))
+        {
+            return configuredPath;
+		}
+
+		return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, configuredPath));
+	}
 }

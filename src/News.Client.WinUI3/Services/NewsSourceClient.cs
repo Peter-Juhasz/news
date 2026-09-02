@@ -9,6 +9,7 @@ public sealed class NewsSourceClient(IRssFeedClient rssFeedClient) : INewsSource
         {
             RssNewsSource rss => rssFeedClient.LoadAsync(rss.Url, cancellationToken),
             RedditNewsSource reddit => rssFeedClient.LoadAsync(reddit.FeedUrl, cancellationToken),
+            YouTubeNewsSource youTube => rssFeedClient.LoadAsync(youTube.FeedUrl, cancellationToken),
             _ => throw new NotSupportedException($"Unsupported source type: {source.GetType().Name}.")
         };
 }

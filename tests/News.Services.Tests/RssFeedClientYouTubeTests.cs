@@ -1,8 +1,3 @@
-using System.Net;
-using System.Text;
-using Microsoft.Extensions.Logging.Abstractions;
-using News.Domain;
-
 namespace News.Services.Tests;
 
 /// <summary>
@@ -82,7 +77,10 @@ public sealed class RssFeedClientYouTubeTests
     [TestMethod]
     public async Task LoadAsync_YouTubeChannelFeed_MapsEveryFieldOfTheEntry()
     {
-        var item = await LoadSingleItemAsync(Feed, TestContext.CancellationToken);
+        var item = await FeedTestHost.LoadSingleItemAsync(
+            Feed,
+            "https://www.youtube.com/feeds/videos.xml?channel_id=UC7kIy8fZavEni8Gzl8NLjOQ",
+            TestContext.CancellationToken);
 
         Assert.AreEqual("yt:video:CyhHz23AHb4", item.Id);
         Assert.AreEqual("All Things Are Empty - Intro to Madhyamaka Buddhism", item.Title);
@@ -103,29 +101,4 @@ public sealed class RssFeedClientYouTubeTests
         Assert.AreEqual(ExpectedLead, item.Lead);
     }
 
-    private static async Task<NewsItem> LoadSingleItemAsync(string feed, CancellationToken cancellationToken)
-    {
-        using var handler = new StubHttpMessageHandler(feed);
-        using var httpClient = new HttpClient(handler);
-        var client = new RssFeedClient(httpClient, NullLogger<RssFeedClient>.Instance);
-
-        var items = await client.LoadAsync(
-            "https://www.youtube.com/feeds/videos.xml?channel_id=UC7kIy8fZavEni8Gzl8NLjOQ",
-            cancellationToken);
-
-        Assert.HasCount(1, items);
-        return items[0];
-    }
-
-    private sealed class StubHttpMessageHandler(string payload) : HttpMessageHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(
-            HttpRequestMessage request,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
-            {
-                RequestMessage = request,
-                Content = new StringContent(payload, Encoding.UTF8, "application/atom+xml")
-            });
-    }
 }

@@ -53,7 +53,7 @@ public sealed class GroupsFileLoader
         }
 
         var title = string.IsNullOrWhiteSpace(source.Title) ? null : source.Title.Trim();
-        var defaultView = ParseDefaultView(source.DefaultView, groupTitle);
+        var view = ParseView(source.View, groupTitle);
 
         return source.Type.Trim().ToLowerInvariant() switch
         {
@@ -62,28 +62,28 @@ public sealed class GroupsFileLoader
                 Frequency: source.Frequency)
             {
                 Title = title,
-                DefaultView = defaultView
+                View = view
             },
             "reddit" => new RedditNewsSource(
                 Subreddit: RequireValue(source.Subreddit, "subreddit", groupTitle),
                 Frequency: source.Frequency)
             {
                 Title = title,
-                DefaultView = defaultView
+                View = view
             },
             "youtube" => new YouTubeNewsSource(
                 ChannelId: RequireValue(source.ChannelId, "channelId", groupTitle),
                 Frequency: source.Frequency)
             {
                 Title = title,
-                DefaultView = defaultView
+                View = view
             },
             _ => throw new InvalidDataException(
                 $"Unsupported source type '{source.Type}' in group '{groupTitle}'. Expected 'rss', 'reddit' or 'youtube'.")
         };
     }
 
-    private static NewsContentMode? ParseDefaultView(string? value, string groupTitle)
+    private static NewsContentMode? ParseView(string? value, string groupTitle)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -93,7 +93,7 @@ public sealed class GroupsFileLoader
         if (!Enum.TryParse<NewsContentMode>(value.Trim(), ignoreCase: true, out var mode))
         {
             throw new InvalidDataException(
-                $"Unsupported default view '{value}' in group '{groupTitle}'. Expected 'text', 'html' or 'web'.");
+                $"Unsupported view '{value}' in group '{groupTitle}'. Expected 'text', 'html' or 'web'.");
         }
 
         return mode;
@@ -136,6 +136,6 @@ public sealed class GroupsFileLoader
 
         public string? Title { get; init; }
 
-        public string? DefaultView { get; init; }
+        public string? View { get; init; }
     }
 }

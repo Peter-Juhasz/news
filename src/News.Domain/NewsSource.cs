@@ -8,9 +8,9 @@ public abstract record NewsSource(TimeSpan Frequency)
     public string? Title { get; init; }
 
     /// <summary>
-    /// View the details pane opens with for items from this source. Optional.
+    /// View the details pane shows for items from this source. Optional; the text view is used when unset.
     /// </summary>
-    public NewsContentMode? DefaultView { get; init; }
+    public NewsContentMode? View { get; init; }
 
     public bool IsStale(DateTimeOffset? lastLoadedAt, DateTimeOffset now) =>
         lastLoadedAt is null || Frequency <= TimeSpan.Zero || now - lastLoadedAt.Value >= Frequency;

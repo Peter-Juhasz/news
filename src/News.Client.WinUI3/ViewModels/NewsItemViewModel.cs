@@ -39,9 +39,9 @@ public sealed class NewsItemViewModel(NewsItem item, NewsSource source, bool sho
     public string? SourceTitle { get; } = source.Title;
 
     /// <summary>
-    /// View this item's source prefers when the item is selected.
+    /// View this item's source is shown in, if it configures one.
     /// </summary>
-    public NewsContentMode? DefaultView { get; } = source.DefaultView;
+    public NewsContentMode? View { get; } = source.View;
 
     public bool HasImage => ImageUri is not null;
 

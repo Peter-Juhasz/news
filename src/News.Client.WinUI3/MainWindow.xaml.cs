@@ -4,7 +4,6 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using News.Client.WinUI3.ViewModels;
-using News.Domain;
 
 namespace News.Client.WinUI3;
 
@@ -33,7 +32,6 @@ public sealed partial class MainWindow : Window
         await EnsureWebViewReadyAsync();
         await ViewModel.InitializeAsync();
 
-        SyncContentModeSelector();
         UpdateWebViewContent();
 
         // Selecting the first group raises SelectionChanged, which is what fetches its
@@ -119,19 +117,6 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void ContentModeSelectorSelectionChanged(SelectorBar sender, SelectorBarSelectionChangedEventArgs args)
-    {
-        if (sender.SelectedItem is not SelectorBarItem selectedItem)
-        {
-            return;
-        }
-
-        if (Enum.TryParse<NewsContentMode>(selectedItem.Tag as string, ignoreCase: true, out var mode))
-        {
-            ViewModel.SetContentMode(mode);
-        }
-    }
-
     private void ViewModelOnPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(MainViewModel.SelectedGroup))
@@ -142,11 +127,6 @@ public sealed partial class MainWindow : Window
         if (e.PropertyName is nameof(MainViewModel.SelectedItem))
         {
             SyncListSelection();
-        }
-
-        if (e.PropertyName is nameof(MainViewModel.SelectedContentMode) or nameof(MainViewModel.HasMultipleContentModes))
-        {
-            SyncContentModeSelector();
         }
 
         if (e.PropertyName is nameof(MainViewModel.SelectedHtmlContent) or nameof(MainViewModel.IsHtmlContentMode))
@@ -177,16 +157,6 @@ public sealed partial class MainWindow : Window
         {
             _isSyncingNavigationSelection = false;
         }
-    }
-
-    private void SyncContentModeSelector()
-    {
-        ContentModeSelector.SelectedItem = ViewModel.SelectedContentMode switch
-        {
-            NewsContentMode.Html => HtmlModeSelectorItem,
-            NewsContentMode.Web => WebModeSelectorItem,
-            _ => TextModeSelectorItem
-        };
     }
 
     private void UpdateWebViewContent()

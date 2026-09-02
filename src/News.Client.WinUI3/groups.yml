@@ -10,8 +10,8 @@ groups:
         subreddit: dotnet
         frequency: 00:15:00
         title: r/dotnet
-        # Optional: text, html or web. Selecting an item from this source opens this view.
-        defaultView: web
+        # Optional: text, html or web. Items from this source are shown in this view.
+        view: web
       - type: youtube
         channelId: UCsBjURrPoezykLs9EqgamOA
         frequency: 01:00:00

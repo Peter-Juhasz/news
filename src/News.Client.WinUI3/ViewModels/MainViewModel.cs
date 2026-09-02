@@ -102,9 +102,6 @@ public sealed partial class MainViewModel : ObservableObject
 
     public bool HasWebContent => SelectedUrlUri is not null;
 
-    public bool HasMultipleContentModes =>
-        (HasPlainContent ? 1 : 0) + (HasHtmlContent ? 1 : 0) + (HasWebContent ? 1 : 0) > 1;
-
     public bool IsTextContentMode => HasSelection && SelectedContentMode == NewsContentMode.Text;
 
     /// <summary>
@@ -177,16 +174,6 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     private bool IsStillSelected(NewsGroupViewModel group) => ReferenceEquals(SelectedGroup, group);
-
-    public void SetContentMode(NewsContentMode mode)
-    {
-        if (!IsContentModeAvailable(mode))
-        {
-            return;
-        }
-
-        SelectedContentMode = mode;
-    }
 
     private bool IsContentModeAvailable(NewsContentMode mode) => mode switch
     {
@@ -345,16 +332,17 @@ public sealed partial class MainViewModel : ObservableObject
 
     partial void OnSelectedItemChanged(NewsItemViewModel? value)
     {
-        SelectedContentMode = ResolveInitialContentMode(value);
+        SelectedContentMode = ResolveContentMode(value);
         RaiseSelectedItemPresentationPropertiesChanged();
     }
 
-    private NewsContentMode ResolveInitialContentMode(NewsItemViewModel? item)
+    private NewsContentMode ResolveContentMode(NewsItemViewModel? item)
     {
-        // The source's preferred view wins whenever this item can actually show it.
-        if (item?.DefaultView is { } preferred && IsContentModeAvailable(preferred))
+        // The source decides the view; the text view stands in when it configures none, or
+        // when this item cannot show the one it asks for.
+        if (item?.View is { } configured && IsContentModeAvailable(configured))
         {
-            return preferred;
+            return configured;
         }
 
         return NewsContentMode.Text;
@@ -391,7 +379,6 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(HasPlainContent));
         OnPropertyChanged(nameof(HasHtmlContent));
         OnPropertyChanged(nameof(HasWebContent));
-        OnPropertyChanged(nameof(HasMultipleContentModes));
         OnPropertyChanged(nameof(IsTextContentMode));
         OnPropertyChanged(nameof(IsFormattedTextContentMode));
         OnPropertyChanged(nameof(IsPlainTextContentMode));

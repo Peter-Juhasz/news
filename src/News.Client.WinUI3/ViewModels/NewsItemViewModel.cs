@@ -66,6 +66,14 @@ public sealed class NewsItemViewModel(NewsItem item, NewsSource source, bool sho
 
     public string TimeText => Date.ToLocalTime().ToString("HH:mm");
 
+    /// <summary>
+    /// Whether the title or the lead contains <paramref name="query"/> — the two lines a reader
+    /// scans down the list, so the two the search box looks through.
+    /// </summary>
+    public bool Matches(string query) =>
+        Title.Contains(query, StringComparison.CurrentCultureIgnoreCase)
+        || Lead.Contains(query, StringComparison.CurrentCultureIgnoreCase);
+
     public string PlainContent => HtmlUtility.ToPlainText(Content);
 
     public string? HtmlContent => HtmlUtility.LooksLikeHtml(Content) ? Content : null;

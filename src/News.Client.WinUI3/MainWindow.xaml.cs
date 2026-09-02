@@ -4,6 +4,11 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using News.Client.WinUI3.ViewModels;
+using Windows.System;
+
+// Windows.System carries a DispatcherQueuePriority of its own; this is the one the WinUI
+// dispatcher takes.
+using DispatcherQueuePriority = Microsoft.UI.Dispatching.DispatcherQueuePriority;
 
 namespace News.Client.WinUI3;
 
@@ -104,6 +109,79 @@ public sealed partial class MainWindow : Window
         {
             ViewModel.CopySelectedAsTextCommand.Execute(null);
         }
+    }
+
+    private void SearchButtonClick(object sender, RoutedEventArgs e)
+    {
+        ViewModel.IsSearchOpen = true;
+
+        // This click leaves focus on a button that the same change collapses, and the focus
+        // manager rehomes focus off a collapsed element after the current batch of work. Low
+        // priority puts the box's claim on focus after that, rather than under it — and after
+        // the layout pass that gives the box a template to focus into.
+        DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, FocusSearchBox);
+    }
+
+    /// <summary>
+    /// Focuses the search box's templated text box. <see cref="AutoSuggestBox"/> only forwards
+    /// <see cref="UIElement.Focus"/> to that part once its template is applied, so going
+    /// straight to the part avoids the call quietly doing nothing.
+    /// </summary>
+    private void FocusSearchBox()
+    {
+        SearchBox.UpdateLayout();
+
+        if (FindDescendant<TextBox>(SearchBox) is { } textBox)
+        {
+            textBox.Focus(FocusState.Programmatic);
+            return;
+        }
+
+        SearchBox.Focus(FocusState.Programmatic);
+    }
+
+    private static T? FindDescendant<T>(DependencyObject root)
+        where T : DependencyObject
+    {
+        var childCount = VisualTreeHelper.GetChildrenCount(root);
+
+        for (var index = 0; index < childCount; index++)
+        {
+            var child = VisualTreeHelper.GetChild(root, index);
+
+            if (child is T match)
+            {
+                return match;
+            }
+
+            if (FindDescendant<T>(child) is { } nested)
+            {
+                return nested;
+            }
+        }
+
+        return null;
+    }
+
+    private void SearchBoxLostFocus(object sender, RoutedEventArgs e)
+    {
+        // An empty box earns none of the room it takes from the list.
+        if (!ViewModel.HasSearchText)
+        {
+            ViewModel.IsSearchOpen = false;
+        }
+    }
+
+    private void SearchBoxKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Key is not VirtualKey.Escape)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        ViewModel.CloseSearchCommand.Execute(null);
+        NewsListView.Focus(FocusState.Programmatic);
     }
 
     private void NewsContextFlyoutOpening(object? sender, object e)

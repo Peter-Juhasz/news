@@ -16,6 +16,13 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly INewsSourceClient _newsSourceClient;
     private readonly ILoggerFactory _loggerFactory;
     private readonly SemaphoreSlim _selectionLock = new(1, 1);
+
+    /// <summary>
+    /// Every row of the selected group, before the search text narrows it down. Held so typing
+    /// re-groups this list instead of merging the group's sources again on each keystroke.
+    /// </summary>
+    private readonly List<NewsItemViewModel> _items = [];
+
     private bool _initialized;
 
     public MainViewModel(
@@ -42,6 +49,8 @@ public sealed partial class MainViewModel : ObservableObject
         CopySelectedUrlCommand = new RelayCommand(
             execute: CopySelectedUrl,
             canExecute: () => CanOpenSelected);
+
+        CloseSearchCommand = new RelayCommand(execute: CloseSearch);
     }
 
     public ObservableCollection<NewsGroupViewModel> Groups { get; } = [];
@@ -56,6 +65,8 @@ public sealed partial class MainViewModel : ObservableObject
 
     public IRelayCommand CopySelectedUrlCommand { get; }
 
+    public IRelayCommand CloseSearchCommand { get; }
+
     [ObservableProperty]
     public partial NewsGroupViewModel? SelectedGroup { get; set; }
 
@@ -67,6 +78,24 @@ public sealed partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     public partial bool IsBusy { get; set; }
+
+    /// <summary>
+    /// Whether the search box has taken the place of the icon button over the list.
+    /// </summary>
+    [ObservableProperty]
+    public partial bool IsSearchOpen { get; set; }
+
+    [ObservableProperty]
+    public partial string SearchText { get; set; } = string.Empty;
+
+    public bool IsSearchCollapsed => !IsSearchOpen;
+
+    public bool HasSearchText => !string.IsNullOrWhiteSpace(SearchText);
+
+    /// <summary>
+    /// A search that hides every row: the list is empty for a reason worth spelling out.
+    /// </summary>
+    public bool HasNoMatches => HasSearchText && DayGroups.Count == 0;
 
     public bool HasSelection => SelectedItem is not null;
 
@@ -143,7 +172,10 @@ public sealed partial class MainViewModel : ObservableObject
         // cached shows straight away; a group not loaded yet simply shows an empty list.
         SelectedGroup = group;
         IsBusy = true;
-        RebuildDayGroups(group);
+
+        // A query typed against the previous group says nothing about this one.
+        CloseSearch();
+        RebuildItems(group);
 
         await _selectionLock.WaitAsync(cancellationToken);
         try
@@ -159,7 +191,7 @@ public sealed partial class MainViewModel : ObservableObject
 
             if (IsStillSelected(group))
             {
-                RebuildDayGroups(group);
+                RebuildItems(group);
             }
         }
         finally
@@ -198,7 +230,7 @@ public sealed partial class MainViewModel : ObservableObject
 
             if (IsStillSelected(group))
             {
-                RebuildDayGroups(group);
+                RebuildItems(group);
             }
         }
         finally
@@ -273,6 +305,8 @@ public sealed partial class MainViewModel : ObservableObject
         }
 
         SelectedGroup = null;
+        CloseSearch();
+        _items.Clear();
         DayGroups.Clear();
         SelectedItem = null;
     }
@@ -296,14 +330,30 @@ public sealed partial class MainViewModel : ObservableObject
         RefreshSelectedGroupCommand.NotifyCanExecuteChanged();
     }
 
-    private void RebuildDayGroups(NewsGroupViewModel newsGroup)
+    private void RebuildItems(NewsGroupViewModel newsGroup)
     {
         // Only a group merging several sources needs each row to name the one it came from.
         var showSourceName = newsGroup.HasMultipleSources;
-        var selectedUrl = SelectedItem?.Url;
-        var groupedItems = newsGroup
+
+        _items.Clear();
+        _items.AddRange(newsGroup
             .GetMergedItems()
-            .Select(entry => new NewsItemViewModel(entry.Item, entry.Source, showSourceName))
+            .Select(entry => new NewsItemViewModel(entry.Item, entry.Source, showSourceName)));
+
+        RebuildDayGroups();
+    }
+
+    /// <summary>
+    /// Groups the items the search text lets through into the days the list shows, keeping the
+    /// reading pane on the selected story while it is still listed and handing it the first row
+    /// when it is not.
+    /// </summary>
+    private void RebuildDayGroups()
+    {
+        var selectedUrl = SelectedItem?.Url;
+        var query = HasSearchText ? SearchText.Trim() : null;
+        var groupedItems = _items
+            .Where(item => query is null || item.Matches(query))
             .GroupBy(item => DateOnly.FromDateTime(item.Date.LocalDateTime.Date))
             .OrderByDescending(group => group.Key);
 
@@ -323,6 +373,14 @@ public sealed partial class MainViewModel : ObservableObject
         }
 
         SelectedItem = selectedCandidate ?? DayGroups.SelectMany(group => group).FirstOrDefault();
+
+        OnPropertyChanged(nameof(HasNoMatches));
+    }
+
+    private void CloseSearch()
+    {
+        SearchText = string.Empty;
+        IsSearchOpen = false;
     }
 
     partial void OnSelectedGroupChanged(NewsGroupViewModel? value)
@@ -360,6 +418,17 @@ public sealed partial class MainViewModel : ObservableObject
     partial void OnIsBusyChanged(bool value)
     {
         RefreshSelectedGroupCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnIsSearchOpenChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsSearchCollapsed));
+    }
+
+    partial void OnSearchTextChanged(string value)
+    {
+        OnPropertyChanged(nameof(HasSearchText));
+        RebuildDayGroups();
     }
 
     private void RaiseSelectedItemPresentationPropertiesChanged()

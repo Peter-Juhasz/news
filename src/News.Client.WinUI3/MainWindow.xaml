@@ -210,6 +210,17 @@
                             </ListView.ItemTemplate>
                         </ListView>
 
+                        <TextBlock
+                            Margin="24"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Style="{StaticResource BodyTextBlockStyle}"
+                            Text="No stories match your search."
+                            TextAlignment="Center"
+                            TextWrapping="Wrap"
+                            Visibility="{x:Bind ViewModel.HasNoMatches, Mode=OneWay}" />
+
                         <!-- Sits over the list so a refresh reads as the list loading. -->
                         <muxc:ProgressRing
                             Width="32"
@@ -218,6 +229,36 @@
                             VerticalAlignment="Center"
                             IsActive="{x:Bind ViewModel.IsBusy, Mode=OneWay}"
                             Visibility="{x:Bind ViewModel.IsBusy, Mode=OneWay}" />
+
+                        <!-- Rides over the list's top-right corner: a bare glyph until it is
+                             wanted, a filter box once it is opened. -->
+                        <Grid
+                            Margin="0,6,12,0"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Top">
+                            <Button
+                                AutomationProperties.Name="Search"
+                                Click="SearchButtonClick"
+                                Style="{StaticResource SubtleButtonStyle}"
+                                ToolTipService.ToolTip="Search"
+                                Visibility="{x:Bind ViewModel.IsSearchCollapsed, Mode=OneWay}">
+                                <FontIcon
+                                    FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                                    FontSize="14"
+                                    Glyph="&#xE721;" />
+                            </Button>
+
+                            <AutoSuggestBox
+                                x:Name="SearchBox"
+                                Width="240"
+                                AutomationProperties.Name="Search stories"
+                                KeyDown="SearchBoxKeyDown"
+                                LostFocus="SearchBoxLostFocus"
+                                PlaceholderText="Search title and lead"
+                                QueryIcon="Find"
+                                Text="{x:Bind ViewModel.SearchText, Mode=TwoWay}"
+                                Visibility="{x:Bind ViewModel.IsSearchOpen, Mode=OneWay}" />
+                        </Grid>
                     </Grid>
 
                     <!-- The NavigationView's own content layer is transparent so Mica shows through

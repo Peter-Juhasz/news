@@ -16,15 +16,15 @@ public sealed class RssFeedClient(HttpClient httpClient, ILogger<RssFeedClient> 
 
         response.EnsureSuccessStatusCode();
 
-        var xml = await response.Content.ReadAsStringAsync(cancellationToken);
-        var items = ParseFeed(xml);
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        var document = await XDocument.LoadAsync(stream, LoadOptions.None, cancellationToken);
+        var items = ParseFeed(document);
         logger.LogDebug("Loaded {Count} items from {Url}", items.Count, url);
         return items;
     }
 
-    private static IReadOnlyList<NewsItem> ParseFeed(string xml)
+    private static IReadOnlyList<NewsItem> ParseFeed(XDocument document)
     {
-        var document = XDocument.Parse(xml);
         var root = document.Root ?? throw new FormatException("The feed is missing a root element.");
 
         return root.Name.LocalName switch

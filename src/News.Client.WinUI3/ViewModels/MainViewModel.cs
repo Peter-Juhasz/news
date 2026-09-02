@@ -57,9 +57,17 @@ public sealed partial class MainViewModel : ObservableObject
 
     public bool HasSelection => SelectedItem is not null;
 
+    public bool HasNoSelection => SelectedItem is null;
+
     public string SelectedTitle => SelectedItem?.Title ?? "Select a story";
 
     public string SelectedDateTimeText => SelectedItem?.Date.ToLocalTime().ToString("f") ?? string.Empty;
+
+    public string SelectedSource => SelectedUrlUri?.Host ?? string.Empty;
+
+    public string SelectedByline => string.IsNullOrEmpty(SelectedSource)
+        ? SelectedDateTimeText
+        : $"{SelectedSource} · {SelectedDateTimeText}";
 
     public string SelectedUrl => SelectedItem?.Url ?? string.Empty;
 
@@ -253,8 +261,11 @@ public sealed partial class MainViewModel : ObservableObject
     private void RaiseSelectedItemPresentationPropertiesChanged()
     {
         OnPropertyChanged(nameof(HasSelection));
+        OnPropertyChanged(nameof(HasNoSelection));
         OnPropertyChanged(nameof(SelectedTitle));
         OnPropertyChanged(nameof(SelectedDateTimeText));
+        OnPropertyChanged(nameof(SelectedSource));
+        OnPropertyChanged(nameof(SelectedByline));
         OnPropertyChanged(nameof(SelectedUrl));
         OnPropertyChanged(nameof(SelectedUrlUri));
         OnPropertyChanged(nameof(SelectedPlainContent));

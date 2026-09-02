@@ -3,7 +3,8 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
-    Title="News Reader">
+    xmlns:vm="using:News.Client.WinUI3.ViewModels"
+    Title="News">
 
     <Grid x:Name="RootGrid" Loaded="RootGridLoaded">
         <Grid.Resources>
@@ -11,194 +12,254 @@
         </Grid.Resources>
 
         <Grid.RowDefinitions>
-            <RowDefinition Height="40" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <Grid x:Name="AppTitleBar" Grid.Row="0" Padding="16,0">
+        <Grid
+            x:Name="AppTitleBar"
+            Grid.Row="0"
+            Height="48"
+            Padding="16,0">
             <StackPanel
                 VerticalAlignment="Center"
                 Orientation="Horizontal"
-                Spacing="10">
+                Spacing="12">
                 <FontIcon
                     FontFamily="{ThemeResource SymbolThemeFontFamily}"
-                    FontSize="15"
+                    FontSize="16"
                     Glyph="&#xE99A;" />
-                <TextBlock Style="{ThemeResource CaptionTextBlockStyle}" Text="News" />
+                <TextBlock Style="{StaticResource CaptionTextBlockStyle}" Text="News" />
             </StackPanel>
         </Grid>
 
         <muxc:NavigationView
             x:Name="GroupsNavigationView"
             Grid.Row="1"
-            IsSettingsVisible="False"
+            AlwaysShowHeader="False"
             IsBackButtonVisible="Collapsed"
+            IsSettingsVisible="False"
+            MenuItemsSource="{x:Bind ViewModel.Groups}"
             PaneDisplayMode="Top"
-            SelectionChanged="GroupsNavigationViewSelectionChanged"
-            MenuItemsSource="{Binding Groups}">
+            SelectionChanged="GroupsNavigationViewSelectionChanged">
+            <muxc:NavigationView.Resources>
+                <!-- Let the Mica backdrop show through instead of the default content layer. -->
+                <SolidColorBrush x:Key="NavigationViewContentBackground" Color="Transparent" />
+                <SolidColorBrush x:Key="NavigationViewContentGridBorderBrush" Color="Transparent" />
+                <Thickness x:Key="NavigationViewContentGridBorderThickness">0</Thickness>
+                <SolidColorBrush x:Key="NavigationViewTopPaneBackground" Color="Transparent" />
+            </muxc:NavigationView.Resources>
+
             <muxc:NavigationView.MenuItemTemplate>
-                <DataTemplate>
-                    <TextBlock Text="{Binding Title}" />
+                <DataTemplate x:DataType="vm:NewsGroupViewModel">
+                    <TextBlock Text="{x:Bind Title}" />
                 </DataTemplate>
             </muxc:NavigationView.MenuItemTemplate>
 
-            <muxc:NavigationView.Header>
-                <Grid Padding="16,8,16,8" ColumnSpacing="12">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-
-                    <TextBlock
+            <muxc:NavigationView.PaneFooter>
+                <StackPanel
+                    Margin="0,0,4,0"
+                    VerticalAlignment="Center"
+                    Orientation="Horizontal"
+                    Spacing="8">
+                    <muxc:ProgressRing
+                        Width="16"
+                        Height="16"
                         VerticalAlignment="Center"
-                        Text="Headlines"
-                        FontSize="20"
-                        FontWeight="SemiBold" />
+                        IsActive="{x:Bind ViewModel.IsBusy, Mode=OneWay}"
+                        Visibility="{x:Bind ViewModel.IsBusy, Mode=OneWay}" />
 
                     <Button
-                        Grid.Column="1"
                         VerticalAlignment="Center"
-                        Padding="14,8"
-                        Command="{Binding RefreshSelectedGroupCommand}">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <FontIcon Glyph="&#xE72C;" />
-                            <TextBlock Text="Refresh" />
-                        </StackPanel>
+                        AutomationProperties.Name="Refresh"
+                        Command="{x:Bind ViewModel.RefreshSelectedGroupCommand}"
+                        ToolTipService.ToolTip="Refresh">
+                        <FontIcon
+                            FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                            FontSize="16"
+                            Glyph="&#xE72C;" />
                     </Button>
-                </Grid>
-            </muxc:NavigationView.Header>
+                </StackPanel>
+            </muxc:NavigationView.PaneFooter>
 
             <muxc:NavigationView.Content>
-                <Grid Padding="16,0,16,16" ColumnSpacing="16">
+                <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="2*" />
-                        <ColumnDefinition Width="3*" />
+                        <ColumnDefinition Width="2*" MinWidth="320" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="3*" MinWidth="360" />
                     </Grid.ColumnDefinitions>
 
-                    <Border Grid.Column="0" Padding="8" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
-                        <ListView
-                            x:Name="NewsListView"
-                            SelectionMode="Single"
-                            ItemsSource="{Binding Source={StaticResource GroupedNewsSource}}"
-                            SelectionChanged="NewsSelectionChanged">
-                            <ListView.GroupStyle>
-                                <GroupStyle>
-                                    <GroupStyle.HeaderTemplate>
-                                        <DataTemplate>
-                                            <TextBlock
-                                                Margin="0,8,0,6"
-                                                Text="{Binding DayLabel}"
-                                                FontWeight="SemiBold"
-                                                Opacity="0.85" />
-                                        </DataTemplate>
-                                    </GroupStyle.HeaderTemplate>
-                                </GroupStyle>
-                            </ListView.GroupStyle>
+                    <ListView
+                        x:Name="NewsListView"
+                        Grid.Column="0"
+                        Padding="8,0,8,16"
+                        ItemsSource="{Binding Source={StaticResource GroupedNewsSource}}"
+                        SelectionChanged="NewsSelectionChanged"
+                        SelectionMode="Single">
+                        <ListView.ItemContainerStyle>
+                            <Style BasedOn="{StaticResource DefaultListViewItemStyle}" TargetType="ListViewItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                <Setter Property="Padding" Value="12,8" />
+                            </Style>
+                        </ListView.ItemContainerStyle>
 
-                            <ListView.ItemTemplate>
-                                <DataTemplate>
-                                    <Grid Padding="0,8" ColumnSpacing="12">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-
-                                        <Border
-                                            Grid.Column="0"
-                                            Width="68"
-                                            Height="68"
-                                            CornerRadius="6">
-                                            <Image Source="{Binding ImageUri}" Stretch="UniformToFill" />
-                                        </Border>
-
-                                        <StackPanel Grid.Column="1" Spacing="4">
-                                            <TextBlock
-                                                Text="{Binding Title}"
-                                                FontWeight="SemiBold"
-                                                TextWrapping="Wrap"
-                                                MaxLines="2" />
-                                            <TextBlock
-                                                Text="{Binding Lead}"
-                                                Opacity="0.8"
-                                                TextWrapping="Wrap"
-                                                MaxLines="3" />
-                                        </StackPanel>
-
+                        <ListView.GroupStyle>
+                            <GroupStyle>
+                                <GroupStyle.HeaderTemplate>
+                                    <DataTemplate>
                                         <TextBlock
-                                            Grid.Column="2"
-                                            VerticalAlignment="Top"
-                                            Text="{Binding TimeText}"
-                                            Opacity="0.75" />
-                                    </Grid>
-                                </DataTemplate>
-                            </ListView.ItemTemplate>
-                        </ListView>
-                    </Border>
+                                            Margin="0,12,0,4"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            Style="{StaticResource BodyStrongTextBlockStyle}"
+                                            Text="{Binding DayLabel}" />
+                                    </DataTemplate>
+                                </GroupStyle.HeaderTemplate>
+                            </GroupStyle>
+                        </ListView.GroupStyle>
 
-                    <Border Grid.Column="1" Padding="16" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
-                        <Grid RowSpacing="12">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="*" />
-                            </Grid.RowDefinitions>
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="vm:NewsItemViewModel">
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
 
-                            <Grid Grid.Row="0" ColumnSpacing="12">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
+                                    <Border
+                                        Grid.Column="0"
+                                        Width="64"
+                                        Height="64"
+                                        VerticalAlignment="Top"
+                                        Background="{ThemeResource ControlAltFillColorSecondaryBrush}"
+                                        CornerRadius="{ThemeResource ControlCornerRadius}"
+                                        Visibility="{x:Bind HasImage}">
+                                        <!-- Binding (not x:Bind) so the Uri -> ImageSource conversion happens
+                                             per realized container and decoded bitmaps stay recyclable. -->
+                                        <Image Source="{Binding ImageUri}" Stretch="UniformToFill" />
+                                    </Border>
 
-                                <StackPanel Grid.Column="0" Spacing="6">
-                                    <TextBlock
-                                        Text="{Binding SelectedTitle}"
-                                        FontSize="26"
-                                        FontWeight="SemiBold"
-                                        TextWrapping="Wrap" />
-                                    <TextBlock Text="{Binding SelectedDateTimeText}" Opacity="0.8" />
-                                    <HyperlinkButton
-                                        Content="{Binding SelectedUrl}"
-                                        NavigateUri="{Binding SelectedUrlUri}"
-                                        IsEnabled="{Binding CanOpenSelected}" />
-                                </StackPanel>
-
-                                <Button
-                                    Grid.Column="1"
-                                    Padding="14,8"
-                                    Command="{Binding OpenSelectedArticleCommand}"
-                                    IsEnabled="{Binding CanOpenSelected}">
-                                    <StackPanel Orientation="Horizontal" Spacing="6">
-                                        <FontIcon Glyph="&#xE8A7;" />
-                                        <TextBlock Text="Open" />
+                                    <StackPanel
+                                        Grid.Column="1"
+                                        VerticalAlignment="Center"
+                                        Spacing="4">
+                                        <TextBlock
+                                            MaxLines="2"
+                                            Style="{StaticResource BodyStrongTextBlockStyle}"
+                                            Text="{x:Bind Title}"
+                                            TextTrimming="CharacterEllipsis"
+                                            TextWrapping="Wrap" />
+                                        <TextBlock
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            MaxLines="2"
+                                            Style="{StaticResource CaptionTextBlockStyle}"
+                                            Text="{x:Bind Lead}"
+                                            TextTrimming="CharacterEllipsis"
+                                            TextWrapping="Wrap" />
                                     </StackPanel>
-                                </Button>
-                            </Grid>
 
-                            <muxc:SelectorBar
-                                x:Name="ContentModeSelector"
-                                Grid.Row="1"
-                                SelectionChanged="ContentModeSelectorSelectionChanged">
-                                <muxc:SelectorBarItem x:Name="TextModeSelectorItem" Tag="Text" Text="Text" />
-                                <muxc:SelectorBarItem x:Name="HtmlModeSelectorItem" Tag="Html" Text="HTML" />
-                            </muxc:SelectorBar>
+                                    <TextBlock
+                                        Grid.Column="2"
+                                        VerticalAlignment="Top"
+                                        Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                        Style="{StaticResource CaptionTextBlockStyle}"
+                                        Text="{x:Bind TimeText}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
 
-                            <Grid Grid.Row="2">
+                    <Border
+                        Grid.Column="1"
+                        Width="1"
+                        Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
+
+                    <Grid
+                        Grid.Column="2"
+                        Padding="24,8,24,16"
+                        RowSpacing="12">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <Grid Grid.Row="0" ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" Spacing="4">
                                 <TextBlock
-                                    x:Name="SelectStoryTextBlock"
-                                    HorizontalAlignment="Center"
-                                    VerticalAlignment="Center"
-                                    Text="Select a story from the list."
-                                    Opacity="0.75" />
+                                    Style="{StaticResource TitleTextBlockStyle}"
+                                    Text="{x:Bind ViewModel.SelectedTitle, Mode=OneWay}"
+                                    TextWrapping="Wrap" />
+                                <TextBlock
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                    Text="{x:Bind ViewModel.SelectedByline, Mode=OneWay}" />
+                            </StackPanel>
 
-                                <ScrollViewer x:Name="TextContentScrollViewer">
-                                    <TextBlock Text="{Binding SelectedPlainContent}" TextWrapping="Wrap" />
-                                </ScrollViewer>
-
-                                <muxc:WebView2 x:Name="ArticleWebView" />
-                            </Grid>
+                            <Button
+                                Grid.Column="1"
+                                VerticalAlignment="Top"
+                                Command="{x:Bind ViewModel.OpenSelectedArticleCommand}"
+                                IsEnabled="{x:Bind ViewModel.CanOpenSelected, Mode=OneWay}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon
+                                        FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                                        FontSize="16"
+                                        Glyph="&#xE8A7;" />
+                                    <TextBlock Text="Open in browser" />
+                                </StackPanel>
+                            </Button>
                         </Grid>
-                    </Border>
+
+                        <muxc:SelectorBar
+                            x:Name="ContentModeSelector"
+                            Grid.Row="1"
+                            SelectionChanged="ContentModeSelectorSelectionChanged"
+                            Visibility="{x:Bind ViewModel.HasBothContentModes, Mode=OneWay}">
+                            <muxc:SelectorBarItem
+                                x:Name="TextModeSelectorItem"
+                                Tag="Text"
+                                Text="Text" />
+                            <muxc:SelectorBarItem
+                                x:Name="HtmlModeSelectorItem"
+                                Tag="Html"
+                                Text="HTML" />
+                        </muxc:SelectorBar>
+
+                        <Grid Grid.Row="2">
+                            <StackPanel
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Spacing="8"
+                                Visibility="{x:Bind ViewModel.HasNoSelection, Mode=OneWay}">
+                                <FontIcon
+                                    FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                                    FontSize="32"
+                                    Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                    Glyph="&#xE7C3;" />
+                                <TextBlock
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Style="{StaticResource BodyTextBlockStyle}"
+                                    Text="Select a story from the list." />
+                            </StackPanel>
+
+                            <ScrollViewer x:Name="TextContentScrollViewer" Visibility="{x:Bind ViewModel.IsTextContentMode, Mode=OneWay}">
+                                <TextBlock
+                                    IsTextSelectionEnabled="True"
+                                    Style="{StaticResource BodyTextBlockStyle}"
+                                    Text="{x:Bind ViewModel.SelectedPlainContent, Mode=OneWay}"
+                                    TextWrapping="Wrap" />
+                            </ScrollViewer>
+
+                            <muxc:WebView2 x:Name="ArticleWebView" Visibility="{x:Bind ViewModel.IsHtmlContentMode, Mode=OneWay}" />
+                        </Grid>
+                    </Grid>
                 </Grid>
             </muxc:NavigationView.Content>
         </muxc:NavigationView>

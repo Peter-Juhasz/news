@@ -16,7 +16,6 @@ public sealed partial class MainWindow : Window
         ViewModel = viewModel;
         InitializeComponent();
         ConfigureWindowChrome();
-        RootGrid.DataContext = ViewModel;
         GroupedNewsSource.Source = ViewModel.DayGroups;
         ViewModel.PropertyChanged += ViewModelOnPropertyChanged;
     }
@@ -35,7 +34,6 @@ public sealed partial class MainWindow : Window
 
         SyncNavigationSelection();
         SyncContentModeSelector();
-        RefreshDetailVisualState();
         UpdateWebViewContent();
     }
 
@@ -92,15 +90,6 @@ public sealed partial class MainWindow : Window
             SyncContentModeSelector();
         }
 
-        if (e.PropertyName is
-            nameof(MainViewModel.HasSelection) or
-            nameof(MainViewModel.IsTextContentMode) or
-            nameof(MainViewModel.IsHtmlContentMode) or
-            nameof(MainViewModel.HasBothContentModes))
-        {
-            RefreshDetailVisualState();
-        }
-
         if (e.PropertyName is nameof(MainViewModel.SelectedHtmlContent) or nameof(MainViewModel.IsHtmlContentMode))
         {
             UpdateWebViewContent();
@@ -147,14 +136,6 @@ public sealed partial class MainWindow : Window
         }
 
         ArticleWebView.NavigateToString(ViewModel.SelectedHtmlContent);
-    }
-
-    private void RefreshDetailVisualState()
-    {
-        ContentModeSelector.Visibility = ViewModel.HasBothContentModes ? Visibility.Visible : Visibility.Collapsed;
-        SelectStoryTextBlock.Visibility = ViewModel.HasSelection ? Visibility.Collapsed : Visibility.Visible;
-        TextContentScrollViewer.Visibility = ViewModel.IsTextContentMode ? Visibility.Visible : Visibility.Collapsed;
-        ArticleWebView.Visibility = ViewModel.IsHtmlContentMode ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void ConfigureWindowChrome()

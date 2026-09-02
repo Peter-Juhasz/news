@@ -11,6 +11,43 @@ public static partial class HtmlUtility
     [GeneratedRegex(@"\s+", RegexOptions.Compiled)]
     private static partial Regex MultiWhitespaceRegex();
 
+    [GeneratedRegex(
+        """<img\b[^>]*?\bsrc\s*=\s*(?:"(?<url>[^"]*)"|'(?<url>[^']*)'|(?<url>[^\s"'>]+))""",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase)]
+    private static partial Regex ImageSourceRegex();
+
+    /// <summary>
+    /// The first usable &lt;img&gt; source in an HTML body, for items whose feed carries no
+    /// enclosure or Media RSS image of its own.
+    /// </summary>
+    public static string? FindFirstImageUrl(string? content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return null;
+        }
+
+        foreach (Match match in ImageSourceRegex().Matches(content))
+        {
+            var url = WebUtility.HtmlDecode(match.Groups["url"].Value).Trim();
+
+            if (IsAbsoluteHttpUrl(url))
+            {
+                return url;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Relative sources, data URIs and the like cannot be resolved without the article's base
+    /// address, so they do not count as the item's image.
+    /// </summary>
+    private static bool IsAbsoluteHttpUrl(string url) =>
+        url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+        url.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
+
     public static string ToPlainText(string? content)
     {
         if (string.IsNullOrWhiteSpace(content))

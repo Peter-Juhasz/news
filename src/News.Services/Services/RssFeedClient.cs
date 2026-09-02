@@ -68,7 +68,7 @@ public sealed class RssFeedClient(HttpClient httpClient, ILogger<RssFeedClient> 
             Title: title,
             Lead: string.IsNullOrWhiteSpace(lead) ? HtmlUtility.BuildLead(content) : lead,
             Url: string.IsNullOrEmpty(link) ? ReadMediaContentUrl(item) ?? string.Empty : link,
-            ImageUrl: ReadImageUrl(item),
+            ImageUrl: ReadImageUrl(item) ?? HtmlUtility.FindFirstImageUrl(content),
             Content: content,
             Views: ReadViews(item));
     }
@@ -108,7 +108,7 @@ public sealed class RssFeedClient(HttpClient httpClient, ILogger<RssFeedClient> 
                    "Untitled",
             Lead: string.IsNullOrWhiteSpace(lead) ? HtmlUtility.BuildLead(contentValue) : lead,
             Url: url ?? string.Empty,
-            ImageUrl: ReadImageUrl(entry),
+            ImageUrl: ReadImageUrl(entry) ?? HtmlUtility.FindFirstImageUrl(contentValue),
             Content: contentValue,
             Views: ReadViews(entry));
     }

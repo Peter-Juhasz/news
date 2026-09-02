@@ -1,0 +1,8 @@
+title: Tech
+sources:
+  - type: rss
+    url: https://devblogs.microsoft.com/dotnet/feed/
+    frequency: 00:30:00
+  - type: reddit
+    subreddit: dotnet
+    frequency: 00:15:00

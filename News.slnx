@@ -1,0 +1,13 @@
+<Solution>  
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="ARM64" />
+  </Configurations>
+  <Folder Name="/src/">
+    <Project Path="src/News.Client.WinUI3/News.Client.WinUI3.csproj">      
+      <Platform Solution="*|ARM64" Project="ARM64" />
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
+    <Project Path="src/News.Domain/News.Domain.csproj" />
+  </Folder>
+</Solution>

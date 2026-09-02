@@ -266,7 +266,7 @@
                          thickness and corner radius the NavigationView content grid uses. -->
                     <Grid
                         Grid.Column="1"
-                        Padding="24,8,24,16"
+                        Padding="24,24,24,0"
                         Background="{ThemeResource LayerFillColorDefaultBrush}"
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                         BorderThickness="1,1,0,0"
@@ -299,14 +299,12 @@
                                 Grid.Column="1"
                                 VerticalAlignment="Top"
                                 Command="{x:Bind ViewModel.OpenSelectedArticleCommand}"
+                                Style="{StaticResource SubtleButtonStyle}"
                                 IsEnabled="{x:Bind ViewModel.CanOpenSelected, Mode=OneWay}">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <FontIcon
-                                        FontFamily="{ThemeResource SymbolThemeFontFamily}"
-                                        FontSize="16"
-                                        Glyph="&#xE8A7;" />
-                                    <TextBlock Text="Open" />
-                                </StackPanel>
+                                <FontIcon
+                                    FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                                    FontSize="16"
+                                    Glyph="&#xE8A7;" />
                             </Button>
                         </Grid>
 

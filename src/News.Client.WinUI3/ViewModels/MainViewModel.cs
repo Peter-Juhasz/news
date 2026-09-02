@@ -76,14 +76,17 @@ public sealed partial class MainViewModel : ObservableObject
 
     public string SelectedDateTimeText => SelectedItem?.Date.ToLocalTime().ToString("f") ?? string.Empty;
 
-    public string SelectedSource => SelectedItem?.SourceTitle ?? SelectedUrlUri?.Host ?? string.Empty;
+    public string SelectedSource => SelectedItem?.SourceName ?? string.Empty;
 
     public string SelectedViewsText => SelectedItem?.ViewsText ?? string.Empty;
 
-    public string SelectedByline => string.Join(
-        " · ",
-        new[] { SelectedSource, SelectedDateTimeText, SelectedViewsText }
-            .Where(part => !string.IsNullOrEmpty(part)));
+    public string SelectedReactionsText => SelectedItem?.ReactionsText ?? string.Empty;
+
+    public string SelectedByline => NewsItemViewModel.Join(
+        SelectedSource,
+        SelectedDateTimeText,
+        SelectedViewsText,
+        SelectedReactionsText);
 
     public string SelectedUrl => SelectedItem?.Url ?? string.Empty;
 
@@ -138,20 +141,42 @@ public sealed partial class MainViewModel : ObservableObject
 
     public async Task SelectGroupAsync(NewsGroupViewModel group, CancellationToken cancellationToken = default)
     {
+        // The list switches to the new group before anything is awaited, so the previous
+        // group's items never linger on screen while this one loads. Whatever this group has
+        // cached shows straight away; a group not loaded yet simply shows an empty list.
+        SelectedGroup = group;
+        IsBusy = true;
+        RebuildDayGroups(group);
+
         await _selectionLock.WaitAsync(cancellationToken);
         try
         {
-            SelectedGroup = group;
+            if (!IsStillSelected(group))
+            {
+                // A newer selection arrived while this one waited for the lock; it owns the list now.
+                return;
+            }
+
             IsBusy = true;
             await group.RefreshStaleAsync(cancellationToken);
-            RebuildDayGroups(group.GetMergedItems());
+
+            if (IsStillSelected(group))
+            {
+                RebuildDayGroups(group);
+            }
         }
         finally
         {
-            IsBusy = false;
+            if (IsStillSelected(group))
+            {
+                IsBusy = false;
+            }
+
             _selectionLock.Release();
         }
     }
+
+    private bool IsStillSelected(NewsGroupViewModel group) => ReferenceEquals(SelectedGroup, group);
 
     public void SetContentMode(NewsContentMode mode)
     {
@@ -173,7 +198,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     private async Task RefreshSelectedGroupAsync()
     {
-        if (SelectedGroup is null)
+        if (SelectedGroup is not { } group)
         {
             return;
         }
@@ -182,12 +207,20 @@ public sealed partial class MainViewModel : ObservableObject
         try
         {
             IsBusy = true;
-            await SelectedGroup.RefreshAllAsync(CancellationToken.None);
-            RebuildDayGroups(SelectedGroup.GetMergedItems());
+            await group.RefreshAllAsync(CancellationToken.None);
+
+            if (IsStillSelected(group))
+            {
+                RebuildDayGroups(group);
+            }
         }
         finally
         {
-            IsBusy = false;
+            if (IsStillSelected(group))
+            {
+                IsBusy = false;
+            }
+
             _selectionLock.Release();
         }
     }
@@ -276,11 +309,14 @@ public sealed partial class MainViewModel : ObservableObject
         RefreshSelectedGroupCommand.NotifyCanExecuteChanged();
     }
 
-    private void RebuildDayGroups(IReadOnlyList<SourcedNewsItem> items)
+    private void RebuildDayGroups(NewsGroupViewModel newsGroup)
     {
+        // Only a group merging several sources needs each row to name the one it came from.
+        var showSourceName = newsGroup.HasMultipleSources;
         var selectedUrl = SelectedItem?.Url;
-        var groupedItems = items
-            .Select(entry => new NewsItemViewModel(entry.Item, entry.Source))
+        var groupedItems = newsGroup
+            .GetMergedItems()
+            .Select(entry => new NewsItemViewModel(entry.Item, entry.Source, showSourceName))
             .GroupBy(item => DateOnly.FromDateTime(item.Date.LocalDateTime.Date))
             .OrderByDescending(group => group.Key);
 
@@ -346,6 +382,7 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(SelectedDateTimeText));
         OnPropertyChanged(nameof(SelectedSource));
         OnPropertyChanged(nameof(SelectedViewsText));
+        OnPropertyChanged(nameof(SelectedReactionsText));
         OnPropertyChanged(nameof(SelectedByline));
         OnPropertyChanged(nameof(SelectedUrl));
         OnPropertyChanged(nameof(SelectedUrlUri));

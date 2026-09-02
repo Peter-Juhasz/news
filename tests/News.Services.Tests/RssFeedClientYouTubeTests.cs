@@ -1,3 +1,5 @@
+using News.Domain;
+
 namespace News.Services.Tests;
 
 /// <summary>
@@ -97,8 +99,43 @@ public sealed class RssFeedClientYouTubeTests
         Assert.AreEqual("https://i4.ytimg.com/vi/CyhHz23AHb4/hqdefault.jpg", item.ImageUrl);
 
         Assert.AreEqual(313646L, item.Views);
+
+        // media:starRating carries the like count on YouTube, every vote being five stars.
+        Assert.HasCount(1, item.Reactions);
+        Assert.AreEqual(3195L, item.Reactions[NewsReactions.Like]);
+
         Assert.AreEqual(ExpectedContent, item.Content);
         Assert.AreEqual(ExpectedLead, item.Lead);
     }
 
+    /// <summary>
+    /// Elsewhere media:starRating means what it says — an average rating — so its count is not
+    /// a like tally and the entry gets no reaction.
+    /// </summary>
+    [TestMethod]
+    public async Task LoadAsync_NonYouTubeFeedWithStarRating_MapsNoReactions()
+    {
+        const string feed = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <feed xmlns:media="http://search.yahoo.com/mrss/" xmlns="http://www.w3.org/2005/Atom">
+            <entry>
+            <id>urn:example:1</id>
+            <title>A rated review</title>
+            <link rel="alternate" href="https://example.com/reviews/1"/>
+            <updated>2026-08-31T14:13:52+00:00</updated>
+            <summary>A review readers have rated.</summary>
+            <media:community>
+            <media:starRating count="42" average="4.20" min="1" max="5"/>
+            </media:community>
+            </entry>
+            </feed>
+            """;
+
+        var item = await FeedTestHost.LoadSingleItemAsync(
+            feed,
+            "https://example.com/reviews.atom",
+            TestContext.CancellationToken);
+
+        Assert.IsEmpty(item.Reactions);
+    }
 }

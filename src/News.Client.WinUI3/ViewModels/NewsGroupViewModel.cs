@@ -18,6 +18,11 @@ public sealed class NewsGroupViewModel(
 
     public string Title => Group.Title;
 
+    /// <summary>
+    /// Whether the group merges more than one source, so items are worth labelling with theirs.
+    /// </summary>
+    public bool HasMultipleSources => Group.Sources.Count > 1;
+
     public IReadOnlyDictionary<NewsSource, DateTimeOffset?> SourceLastLoadedAt =>
         _sourceStates.ToDictionary(
             keySelector: entry => entry.Key,

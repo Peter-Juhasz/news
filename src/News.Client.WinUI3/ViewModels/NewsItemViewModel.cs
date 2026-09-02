@@ -3,8 +3,11 @@ using News.Services;
 
 namespace News.Client.WinUI3.ViewModels;
 
-public sealed class NewsItemViewModel(NewsItem item, NewsSource source)
+public sealed class NewsItemViewModel(NewsItem item, NewsSource source, bool showSourceName = false)
 {
+    /// <summary>Separates the parts of a metadata line, both here and in the reading pane's byline.</summary>
+    public const string Separator = " · ";
+
     public string? Id { get; } = item.Id;
 
     public DateTimeOffset Date { get; } = item.Date;
@@ -26,6 +29,11 @@ public sealed class NewsItemViewModel(NewsItem item, NewsSource source)
     public long? Views { get; } = item.Views;
 
     /// <summary>
+    /// Audience reactions by name, such as "Like", for the sources that publish counts for them.
+    /// </summary>
+    public IReadOnlyDictionary<string, long> Reactions { get; } = item.Reactions;
+
+    /// <summary>
     /// Name configured on the source, shown instead of the article's host name.
     /// </summary>
     public string? SourceTitle { get; } = source.Title;
@@ -37,15 +45,34 @@ public sealed class NewsItemViewModel(NewsItem item, NewsSource source)
 
     public bool HasImage => ImageUri is not null;
 
-    public bool HasViews => Views is not null;
-
     public string ViewsText => Views is { } views ? $"{FormatCount(views)} views" : string.Empty;
+
+    public string ReactionsText => string.Join(
+        Separator,
+        Reactions.Select(reaction => $"{FormatCount(reaction.Value)} {reaction.Key}"));
+
+    /// <summary>
+    /// Source the item was loaded from, falling back to the article's host name.
+    /// </summary>
+    public string SourceName => SourceTitle ?? UrlUri?.Host ?? string.Empty;
+
+    /// <summary>
+    /// The list row's secondary line: the source name (only where the group merges several
+    /// sources and it tells rows apart), then the view count, then the reactions.
+    /// </summary>
+    public string MetaText => Join(showSourceName ? SourceName : string.Empty, ViewsText, ReactionsText);
+
+    public bool HasMeta => MetaText.Length > 0;
 
     public string TimeText => Date.ToLocalTime().ToString("HH:mm");
 
     public string PlainContent => HtmlUtility.ToPlainText(Content);
 
     public string? HtmlContent => HtmlUtility.LooksLikeHtml(Content) ? Content : null;
+
+    /// <summary>Joins the metadata parts that have something to say, dropping the empty ones.</summary>
+    public static string Join(params string?[] parts) =>
+        string.Join(Separator, parts.Where(part => !string.IsNullOrEmpty(part)));
 
     private static string FormatCount(long value) => value switch
     {

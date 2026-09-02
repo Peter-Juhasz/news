@@ -13,6 +13,12 @@ public sealed class RssFeedClient(HttpClient httpClient, ILogger<RssFeedClient> 
     /// </summary>
     private const string MediaNamespace = "http://search.yahoo.com/mrss/";
 
+    /// <summary>
+    /// YouTube's own feed namespace, which identifies the feed as YouTube's and so tells the
+    /// parser that its media:starRating can be read as a like count.
+    /// </summary>
+    private const string YouTubeNamespace = "http://www.youtube.com/xml/schemas/2015";
+
     public async Task<IReadOnlyList<NewsItem>> LoadAsync(string url, CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
@@ -37,10 +43,17 @@ public sealed class RssFeedClient(HttpClient httpClient, ILogger<RssFeedClient> 
         return root.Name.LocalName switch
         {
             "rss" => ParseRss(root),
-            "feed" => ParseAtom(root),
+            // YouTube publishes Atom only, so the flag is threaded no further than here.
+            "feed" => ParseAtom(root, IsYouTubeFeed(root)),
             _ => throw new FormatException($"Unsupported feed format: {root.Name.LocalName}.")
         };
     }
+
+    private static bool IsYouTubeFeed(XElement root) =>
+        root.Attributes().Any(attribute =>
+            attribute.IsNamespaceDeclaration &&
+            attribute.Value == YouTubeNamespace) ||
+        root.Elements().Any(element => element.Name.NamespaceName == YouTubeNamespace);
 
     private static IReadOnlyList<NewsItem> ParseRss(XElement root)
     {
@@ -73,13 +86,13 @@ public sealed class RssFeedClient(HttpClient httpClient, ILogger<RssFeedClient> 
             Views: ReadViews(item));
     }
 
-    private static IReadOnlyList<NewsItem> ParseAtom(XElement root)
+    private static IReadOnlyList<NewsItem> ParseAtom(XElement root, bool isYouTubeFeed)
     {
         var entryNodes = root.Elements().Where(element => element.Name.LocalName == "entry");
-        return entryNodes.Select(ParseAtomEntry).ToList();
+        return entryNodes.Select(entry => ParseAtomEntry(entry, isYouTubeFeed)).ToList();
     }
 
-    private static NewsItem ParseAtomEntry(XElement entry)
+    private static NewsItem ParseAtomEntry(XElement entry, bool isYouTubeFeed)
     {
         var linkElement = entry
             .Elements()
@@ -110,7 +123,8 @@ public sealed class RssFeedClient(HttpClient httpClient, ILogger<RssFeedClient> 
             Url: url ?? string.Empty,
             ImageUrl: ReadImageUrl(entry) ?? HtmlUtility.FindFirstImageUrl(contentValue),
             Content: contentValue,
-            Views: ReadViews(entry));
+            Views: ReadViews(entry),
+            Reactions: ReadReactions(entry, isYouTubeFeed));
     }
 
     private static string? ReadImageUrl(XElement item)
@@ -168,6 +182,23 @@ public sealed class RssFeedClient(HttpClient httpClient, ILogger<RssFeedClient> 
         var views = (string?)MediaElements(item, "statistics").FirstOrDefault()?.Attribute("views");
         return long.TryParse(views, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) && parsed >= 0
             ? parsed
+            : null;
+    }
+
+    /// <summary>
+    /// YouTube states its like count as a media:starRating count, every vote being five stars.
+    /// Other feeds use the element for an actual rating, so the like only follows from YouTube.
+    /// </summary>
+    private static IReadOnlyDictionary<string, long>? ReadReactions(XElement item, bool isYouTubeFeed)
+    {
+        if (!isYouTubeFeed)
+        {
+            return null;
+        }
+
+        var likes = (string?)MediaElements(item, "starRating").FirstOrDefault()?.Attribute("count");
+        return long.TryParse(likes, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) && parsed >= 0
+            ? new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase) { [NewsReactions.Like] = parsed }
             : null;
     }
 

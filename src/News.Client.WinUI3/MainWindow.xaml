@@ -190,11 +190,13 @@
                                                 Text="{x:Bind Lead}"
                                                 TextTrimming="CharacterEllipsis"
                                                 TextWrapping="Wrap" />
+                                            <!-- Source (only in multi-source groups), views and reactions. -->
                                             <TextBlock
                                                 Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                                 Style="{StaticResource CaptionTextBlockStyle}"
-                                                Text="{x:Bind ViewsText}"
-                                                Visibility="{x:Bind HasViews}" />
+                                                Text="{x:Bind MetaText}"
+                                                TextTrimming="CharacterEllipsis"
+                                                Visibility="{x:Bind HasMeta}" />
                                         </StackPanel>
 
                                         <TextBlock

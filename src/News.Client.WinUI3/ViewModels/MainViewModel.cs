@@ -101,6 +101,16 @@ public sealed partial class MainViewModel : ObservableObject
 
     public bool IsTextContentMode => HasSelection && SelectedContentMode == NewsContentMode.Text;
 
+    /// <summary>
+    /// Text view showing HTML-looking content as native flow text.
+    /// </summary>
+    public bool IsFormattedTextContentMode => IsTextContentMode && HasHtmlContent;
+
+    /// <summary>
+    /// Text view showing content that carries no markup.
+    /// </summary>
+    public bool IsPlainTextContentMode => IsTextContentMode && !HasHtmlContent;
+
     public bool IsHtmlContentMode => HasSelection && SelectedContentMode == NewsContentMode.Html && HasHtmlContent;
 
     public bool IsWebContentMode => HasSelection && SelectedContentMode == NewsContentMode.Web && HasWebContent;
@@ -318,6 +328,8 @@ public sealed partial class MainViewModel : ObservableObject
     partial void OnSelectedContentModeChanged(NewsContentMode value)
     {
         OnPropertyChanged(nameof(IsTextContentMode));
+        OnPropertyChanged(nameof(IsFormattedTextContentMode));
+        OnPropertyChanged(nameof(IsPlainTextContentMode));
         OnPropertyChanged(nameof(IsHtmlContentMode));
         OnPropertyChanged(nameof(IsWebContentMode));
     }
@@ -344,6 +356,8 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(HasWebContent));
         OnPropertyChanged(nameof(HasMultipleContentModes));
         OnPropertyChanged(nameof(IsTextContentMode));
+        OnPropertyChanged(nameof(IsFormattedTextContentMode));
+        OnPropertyChanged(nameof(IsPlainTextContentMode));
         OnPropertyChanged(nameof(IsHtmlContentMode));
         OnPropertyChanged(nameof(IsWebContentMode));
         OnPropertyChanged(nameof(CanOpenSelected));

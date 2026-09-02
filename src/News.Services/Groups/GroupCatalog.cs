@@ -1,10 +1,10 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using News.Client.WinUI3.Configuration;
+using News.Configuration;
 using News.Domain;
 using YamlDotNet.Core;
 
-namespace News.Client.WinUI3.Groups;
+namespace News.Groups;
 
 public sealed class GroupCatalog : IGroupCatalog, IDisposable
 {

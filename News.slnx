@@ -9,11 +9,9 @@
       <Platform Solution="*|x64" Project="x64" />
     </Project>
     <Project Path="src/News.Domain/News.Domain.csproj" />
+    <Project Path="src/News.Services/News.Services.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/News.Client.WinUI3.Tests/News.Client.WinUI3.Tests.csproj">
-      <Platform Solution="*|ARM64" Project="ARM64" />
-      <Platform Solution="*|x64" Project="x64" />
-    </Project>
+    <Project Path="tests/News.Services.Tests/News.Services.Tests.csproj" />
   </Folder>
 </Solution>

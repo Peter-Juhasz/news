@@ -1,6 +1,6 @@
 using News.Domain;
 
-namespace News.Client.WinUI3.Services;
+namespace News.Services;
 
 public sealed class NewsSourceClient(IRssFeedClient rssFeedClient) : INewsSourceClient
 {

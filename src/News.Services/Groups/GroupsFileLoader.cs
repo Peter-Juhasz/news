@@ -2,7 +2,7 @@ using News.Domain;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
-namespace News.Client.WinUI3.Groups;
+namespace News.Groups;
 
 public sealed class GroupsFileLoader
 {

@@ -1,5 +1,5 @@
-using News.Client.WinUI3.Services;
 using News.Domain;
+using News.Services;
 
 namespace News.Client.WinUI3.ViewModels;
 

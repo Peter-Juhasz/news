@@ -1,7 +1,7 @@
 using System.Net;
 using System.Text.RegularExpressions;
 
-namespace News.Client.WinUI3.Services;
+namespace News.Services;
 
 public static partial class HtmlUtility
 {

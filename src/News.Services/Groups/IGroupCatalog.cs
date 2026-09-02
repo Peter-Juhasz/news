@@ -1,6 +1,6 @@
 using News.Domain;
 
-namespace News.Client.WinUI3.Groups;
+namespace News.Groups;
 
 public interface IGroupCatalog
 {

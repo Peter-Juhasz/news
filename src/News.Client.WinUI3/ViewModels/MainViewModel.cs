@@ -1,9 +1,9 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
-using News.Client.WinUI3.Groups;
-using News.Client.WinUI3.Services;
 using News.Domain;
+using News.Groups;
+using News.Services;
 using System.Collections.ObjectModel;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.System;

@@ -1,6 +1,6 @@
 using System.Collections.ObjectModel;
 
-namespace News.Client.WinUI3.Configuration;
+namespace News.Configuration;
 
 public static class DotEnvLoader
 {

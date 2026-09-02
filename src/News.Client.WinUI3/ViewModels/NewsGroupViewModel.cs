@@ -1,7 +1,7 @@
 using System.Xml;
 using Microsoft.Extensions.Logging;
 using News.Domain;
-using News.Client.WinUI3.Services;
+using News.Services;
 
 namespace News.Client.WinUI3.ViewModels;
 

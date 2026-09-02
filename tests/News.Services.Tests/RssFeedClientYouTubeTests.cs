@@ -1,10 +1,9 @@
 using System.Net;
 using System.Text;
 using Microsoft.Extensions.Logging.Abstractions;
-using News.Client.WinUI3.Services;
 using News.Domain;
 
-namespace News.Client.WinUI3.Tests;
+namespace News.Services.Tests;
 
 /// <summary>
 /// YouTube's channel feed is Atom with no content or summary element: the body, image and

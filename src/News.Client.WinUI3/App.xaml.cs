@@ -3,10 +3,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
-using News.Client.WinUI3.Configuration;
-using News.Client.WinUI3.Groups;
-using News.Client.WinUI3.Services;
 using News.Client.WinUI3.ViewModels;
+using News.Configuration;
+using News.Groups;
+using News.Services;
 
 namespace News.Client.WinUI3;
 

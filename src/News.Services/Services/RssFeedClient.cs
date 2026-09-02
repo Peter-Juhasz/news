@@ -3,7 +3,7 @@ using System.Xml.Linq;
 using Microsoft.Extensions.Logging;
 using News.Domain;
 
-namespace News.Client.WinUI3.Services;
+namespace News.Services;
 
 public sealed class RssFeedClient(HttpClient httpClient, ILogger<RssFeedClient> logger) : IRssFeedClient
 {

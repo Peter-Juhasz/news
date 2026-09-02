@@ -38,6 +38,20 @@
     <ProjectReference Include="..\News.Services\News.Services.csproj" />
   </ItemGroup>
 
+    <!-- Every compiled XAML page is indexed into Acc.pri rather than written beside the exe, and the
+       WinUI targets copy that file to the build output without ever offering it to the publish
+       pipeline — the hand-off they do have runs only for an MSIX package, which this app is not.
+       A published app therefore has no XAML to find and dies inside InitializeComponent, before a
+       window exists to say so: no dialog, nothing in the event log, exit code 0xC000027B. -->
+  <Target Name="PublishProjectPriFile" BeforeTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <ResolvedFileToPublish Include="$(ProjectPriFullPath)" Condition="Exists('$(ProjectPriFullPath)')">
+        <RelativePath>$(ProjectPriFileName)</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
+
   <ItemGroup>
     <None Update="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

@@ -90,6 +90,12 @@ public sealed class NewsItemViewModel(NewsItem item, NewsSource source, bool sho
     public string TimeText => Date.ToLocalTime().ToString("HH:mm");
 
     /// <summary>
+    /// Query the list is filtered by, so a row can mark where it matches it. Set as the list is
+    /// rebuilt, which is also when the rows that read it are.
+    /// </summary>
+    public string? SearchQuery { get; set; }
+
+    /// <summary>
     /// Whether the title or the lead contains <paramref name="query"/> — the two lines a reader
     /// scans down the list, so the two the search box looks through.
     /// </summary>

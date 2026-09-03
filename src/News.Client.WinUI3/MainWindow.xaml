@@ -177,13 +177,17 @@
                                             Grid.Column="1"
                                             VerticalAlignment="Center"
                                             Spacing="4">
+                                            <!-- The two lines the search box looks through, so the two
+                                                 that show where a query matched. -->
                                             <TextBlock
+                                                controls:SearchHighlight.Query="{x:Bind SearchQuery}"
                                                 MaxLines="2"
                                                 Style="{StaticResource BodyStrongTextBlockStyle}"
                                                 Text="{x:Bind Title}"
                                                 TextTrimming="CharacterEllipsis"
                                                 TextWrapping="Wrap" />
                                             <TextBlock
+                                                controls:SearchHighlight.Query="{x:Bind SearchQuery}"
                                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                                 MaxLines="2"
                                                 Style="{StaticResource CaptionTextBlockStyle}"

@@ -453,6 +453,13 @@ public sealed partial class MainViewModel : ObservableObject
     {
         var selectedUrl = SelectedItem?.Url;
         var query = _appliedQuery.Length > 0 ? _appliedQuery : null;
+
+        // The rows read this as they are built, which is what marks the matched words in them.
+        foreach (var item in _items)
+        {
+            item.SearchQuery = query;
+        }
+
         var groupedItems = _items
             .Where(item => query is null || item.Matches(query))
             .GroupBy(item => DateOnly.FromDateTime(item.Date.LocalDateTime.Date))

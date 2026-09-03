@@ -7,6 +7,7 @@ using News.Client.WinUI3.ViewModels;
 using News.Configuration;
 using News.Groups;
 using News.Services;
+using News.Storage;
 
 namespace News.Client.WinUI3;
 
@@ -53,6 +54,7 @@ public partial class App : Application
         builder.Services.AddSingleton<GroupsFileLoader>();
         builder.Services.AddSingleton<IGroupCatalog, GroupCatalog>();
         builder.Services.AddSingleton<INewsSourceClient, NewsSourceClient>();
+        builder.Services.AddSingleton<INewsItemStore, NewsItemStore>();
 
         builder.Services
             .AddHttpClient<IRssFeedClient, RssFeedClient>(httpClient =>

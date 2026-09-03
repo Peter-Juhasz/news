@@ -22,7 +22,7 @@ public sealed class GroupCatalog : IGroupCatalog, IDisposable
     {
         _groupsFileLoader = groupsFileLoader;
         _logger = logger;
-        _groupsFilePath = ResolveGroupsFilePath(options.Value.GroupsFilePath);
+        _groupsFilePath = ConfiguredPath.Resolve(options.Value.GroupsFilePath);
     }
 
     public event EventHandler<IReadOnlyList<NewsGroup>>? GroupsChanged;
@@ -131,16 +131,4 @@ public sealed class GroupCatalog : IGroupCatalog, IDisposable
 
         _uiContext.Post(_ => handler(this, CurrentGroups), null);
     }
-
-	private static string ResolveGroupsFilePath(string configuredPath)
-	{
-        configuredPath = Environment.ExpandEnvironmentVariables(configuredPath);
-
-        if (Path.IsPathRooted(configuredPath))
-        {
-            return Path.GetFullPath(configuredPath);
-		}
-
-		return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, configuredPath));
-	}
 }

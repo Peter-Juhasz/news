@@ -3,6 +3,12 @@ namespace News.Domain;
 public abstract record NewsSource(TimeSpan Frequency)
 {
     /// <summary>
+    /// Identifies what this source reads, so items stored for it are recognised as its own when
+    /// they are read back — including after everything else about it was edited.
+    /// </summary>
+    public abstract string Key { get; }
+
+    /// <summary>
     /// Display name shown instead of the article's host name. Optional.
     /// </summary>
     public string? Title { get; init; }
@@ -18,6 +24,8 @@ public abstract record NewsSource(TimeSpan Frequency)
 
 public sealed record RssNewsSource(string Url, TimeSpan Frequency) : NewsSource(Frequency)
 {
+    public override string Key => $"rss:{Url}";
+
     /// <summary>
     /// CSS selector picking the article body out of the page an item links to. Optional; where it
     /// is set, the body shown for an item is fetched from its own page instead of read from the
@@ -28,10 +36,14 @@ public sealed record RssNewsSource(string Url, TimeSpan Frequency) : NewsSource(
 
 public sealed record RedditNewsSource(string Subreddit, TimeSpan Frequency) : NewsSource(Frequency)
 {
+    public override string Key => $"reddit:{Subreddit}";
+
     public string FeedUrl => $"https://reddit.com/r/{Subreddit}.rss";
 }
 
 public sealed record YouTubeNewsSource(string ChannelId, TimeSpan Frequency) : NewsSource(Frequency)
 {
+    public override string Key => $"youtube:{ChannelId}";
+
     public string FeedUrl => $"https://www.youtube.com/feeds/videos.xml?channel_id={Uri.EscapeDataString(ChannelId)}";
 }

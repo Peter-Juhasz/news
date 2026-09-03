@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using News.Domain;
 using News.Groups;
 using News.Services;
+using News.Storage;
 using System.Collections.ObjectModel;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.System;
@@ -15,6 +16,7 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly IGroupCatalog _groupCatalog;
     private readonly INewsSourceClient _newsSourceClient;
     private readonly IArticleContentClient _articleContentClient;
+    private readonly INewsItemStore _newsItemStore;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<MainViewModel> _logger;
     private readonly SemaphoreSlim _selectionLock = new(1, 1);
@@ -37,11 +39,13 @@ public sealed partial class MainViewModel : ObservableObject
         IGroupCatalog groupCatalog,
         INewsSourceClient newsSourceClient,
         IArticleContentClient articleContentClient,
+        INewsItemStore newsItemStore,
         ILoggerFactory loggerFactory)
     {
         _groupCatalog = groupCatalog;
         _newsSourceClient = newsSourceClient;
         _articleContentClient = articleContentClient;
+        _newsItemStore = newsItemStore;
         _loggerFactory = loggerFactory;
         _logger = loggerFactory.CreateLogger<MainViewModel>();
 
@@ -177,11 +181,14 @@ public sealed partial class MainViewModel : ObservableObject
 
         await _groupCatalog.InitializeAsync(cancellationToken);
         _groupCatalog.GroupsChanged += OnGroupsChanged;
-        ApplyGroups(_groupCatalog.CurrentGroups);
-        _initialized = true;
+        var addedGroups = ApplyGroups(_groupCatalog.CurrentGroups);
 
         // Sources are not fetched here: the view navigates to the first group once it is
-        // loaded, and every group fetches on its first navigation instead.
+        // loaded, and every group fetches on its first navigation instead. Every group is
+        // filled from the items it stored on its last load first, so navigating to one shows
+        // those while its sources are fetched again.
+        await RestoreGroupsAsync(addedGroups, cancellationToken);
+        _initialized = true;
     }
 
     public async Task SelectGroupAsync(NewsGroupViewModel group, CancellationToken cancellationToken = default)
@@ -310,7 +317,7 @@ public sealed partial class MainViewModel : ObservableObject
     private void OnGroupsChanged(object? sender, IReadOnlyList<NewsGroup> groups)
     {
         var currentSelectionTitle = SelectedGroup?.Title;
-        ApplyGroups(groups);
+        var addedGroups = ApplyGroups(groups);
 
         var groupToSelect = currentSelectionTitle is null
             ? Groups.FirstOrDefault()
@@ -319,7 +326,7 @@ public sealed partial class MainViewModel : ObservableObject
 
         if (groupToSelect is not null)
         {
-            _ = SelectGroupAsync(groupToSelect);
+            _ = RestoreAndSelectGroupAsync(addedGroups, groupToSelect);
             return;
         }
 
@@ -330,9 +337,15 @@ public sealed partial class MainViewModel : ObservableObject
         SelectedItem = null;
     }
 
-    private void ApplyGroups(IReadOnlyList<NewsGroup> groups)
+    /// <summary>
+    /// Rebuilds the group list, keeping the view model of every group that is still configured
+    /// so it keeps the items it has loaded. Returns the groups that were added, which are the
+    /// ones holding nothing yet.
+    /// </summary>
+    private List<NewsGroupViewModel> ApplyGroups(IReadOnlyList<NewsGroup> groups)
     {
         var currentByGroup = Groups.ToDictionary(vm => vm.Group, vm => vm);
+        var addedGroups = new List<NewsGroupViewModel>();
         Groups.Clear();
 
         foreach (var group in groups)
@@ -343,10 +356,40 @@ public sealed partial class MainViewModel : ObservableObject
                 continue;
             }
 
-            Groups.Add(new NewsGroupViewModel(group, _newsSourceClient, _loggerFactory.CreateLogger<NewsGroupViewModel>()));
+            var addedGroup = new NewsGroupViewModel(
+                group,
+                _newsSourceClient,
+                _newsItemStore,
+                _loggerFactory.CreateLogger<NewsGroupViewModel>());
+
+            Groups.Add(addedGroup);
+            addedGroups.Add(addedGroup);
         }
 
         RefreshSelectedGroupCommand.NotifyCanExecuteChanged();
+        return addedGroups;
+    }
+
+    private async Task RestoreAndSelectGroupAsync(
+        IReadOnlyList<NewsGroupViewModel> groupsToRestore,
+        NewsGroupViewModel groupToSelect)
+    {
+        await RestoreGroupsAsync(groupsToRestore, CancellationToken.None);
+        await SelectGroupAsync(groupToSelect);
+    }
+
+    /// <summary>
+    /// Fills each group with the items it stored on its last load. Runs before a group is
+    /// navigated to, so the list it shows is the stored one rather than an empty one.
+    /// </summary>
+    private static async Task RestoreGroupsAsync(
+        IReadOnlyList<NewsGroupViewModel> groups,
+        CancellationToken cancellationToken)
+    {
+        foreach (var group in groups)
+        {
+            await group.RestoreAsync(cancellationToken);
+        }
     }
 
     private void RebuildItems(NewsGroupViewModel newsGroup)

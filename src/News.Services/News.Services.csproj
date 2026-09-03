@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
 
-    <!-- Folders map onto News.Services, News.Groups and News.Configuration. -->
+    <!-- Folders map onto News.Services, News.Groups, News.Storage and News.Configuration. -->
     <RootNamespace>News</RootNamespace>
   </PropertyGroup>
 

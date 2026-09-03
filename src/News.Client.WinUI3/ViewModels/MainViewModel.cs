@@ -6,6 +6,8 @@ using News.Groups;
 using News.Services;
 using News.Storage;
 using System.Collections.ObjectModel;
+using System.Reactive.Linq;
+using System.Reactive.Subjects;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.System;
 
@@ -13,6 +15,13 @@ namespace News.Client.WinUI3.ViewModels;
 
 public sealed partial class MainViewModel : ObservableObject
 {
+    /// <summary>
+    /// How long typing has to pause before the search text reaches the list. Long enough that a
+    /// word typed at speed regroups the list once rather than once per letter, short enough that
+    /// the pause is not read as the list having stopped responding.
+    /// </summary>
+    private static readonly TimeSpan SearchDelay = TimeSpan.FromMilliseconds(250);
+
     private readonly IGroupCatalog _groupCatalog;
     private readonly INewsSourceClient _newsSourceClient;
     private readonly IArticleContentClient _articleContentClient;
@@ -26,6 +35,17 @@ public sealed partial class MainViewModel : ObservableObject
     /// re-groups this list instead of merging the group's sources again on each keystroke.
     /// </summary>
     private readonly List<NewsItemViewModel> _items = [];
+
+    /// <summary>
+    /// Every keystroke in the search box, on its way to <see cref="ApplyQuery"/>.
+    /// </summary>
+    private readonly Subject<string> _searchTextInput = new();
+
+    /// <summary>
+    /// The trimmed query <see cref="DayGroups"/> was last built against. It trails
+    /// <see cref="SearchText"/> by the throttle window while a word is being typed.
+    /// </summary>
+    private string _appliedQuery = string.Empty;
 
     private bool _initialized;
 
@@ -66,6 +86,23 @@ public sealed partial class MainViewModel : ObservableObject
             canExecute: () => CanOpenSelected);
 
         CloseSearchCommand = new RelayCommand(execute: CloseSearch);
+
+        // Filtering walks every loaded item, so the text is only applied once typing settles,
+        // and only when it settles on something other than the query already showing —
+        // backspacing over a letter and typing it again leaves the list alone.
+        var searchQueries = _searchTextInput
+            .Select(text => text.Trim())
+            .Throttle(SearchDelay)
+            .DistinctUntilChanged(StringComparer.Ordinal);
+
+        // Throttle's timer runs on a pool thread, while the collections a query rebuilds belong
+        // to the thread this view model is built on — the UI one. Nothing unsubscribes: the
+        // subscription reaches no further than the subject it reads, both of which live exactly
+        // as long as this view model does.
+        _ = (SynchronizationContext.Current is { } uiContext
+                ? searchQueries.ObserveOn(uiContext)
+                : searchQueries)
+            .Subscribe(ApplyQuery);
     }
 
     public ObservableCollection<NewsGroupViewModel> Groups { get; } = [];
@@ -114,9 +151,11 @@ public sealed partial class MainViewModel : ObservableObject
     public bool HasSearchText => !string.IsNullOrWhiteSpace(SearchText);
 
     /// <summary>
-    /// A search that hides every row: the list is empty for a reason worth spelling out.
+    /// A search that hides every row: the list is empty for a reason worth spelling out. Reads
+    /// the applied query rather than <see cref="SearchText"/>, so the message appears with the
+    /// empty list it explains instead of a throttle window ahead of it.
     /// </summary>
-    public bool HasNoMatches => HasSearchText && DayGroups.Count == 0;
+    public bool HasNoMatches => _appliedQuery.Length > 0 && DayGroups.Count == 0;
 
     public bool HasSelection => SelectedItem is not null;
 
@@ -413,7 +452,7 @@ public sealed partial class MainViewModel : ObservableObject
     private void RebuildDayGroups()
     {
         var selectedUrl = SelectedItem?.Url;
-        var query = HasSearchText ? SearchText.Trim() : null;
+        var query = _appliedQuery.Length > 0 ? _appliedQuery : null;
         var groupedItems = _items
             .Where(item => query is null || item.Matches(query))
             .GroupBy(item => DateOnly.FromDateTime(item.Date.LocalDateTime.Date))
@@ -439,10 +478,29 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(HasNoMatches));
     }
 
+    /// <summary>
+    /// Narrows the list to <paramref name="query"/>, unless it is already the one shown — which
+    /// is how a query cleared outright settles the throttled emission that follows it.
+    /// </summary>
+    private void ApplyQuery(string query)
+    {
+        if (string.Equals(_appliedQuery, query, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _appliedQuery = query;
+        RebuildDayGroups();
+    }
+
     private void CloseSearch()
     {
         SearchText = string.Empty;
         IsSearchOpen = false;
+
+        // Closing the box is a decision, not typing: the list is whole again at once rather
+        // than a throttle window later.
+        ApplyQuery(string.Empty);
     }
 
     partial void OnSelectedGroupChanged(NewsGroupViewModel? value)
@@ -564,7 +622,7 @@ public sealed partial class MainViewModel : ObservableObject
     partial void OnSearchTextChanged(string value)
     {
         OnPropertyChanged(nameof(HasSearchText));
-        RebuildDayGroups();
+        _searchTextInput.OnNext(value);
     }
 
     private void RaiseSelectedItemPresentationPropertiesChanged()

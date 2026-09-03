@@ -132,6 +132,18 @@ public sealed partial class MainViewModel : ObservableObject
     public partial bool IsBusy { get; set; }
 
     /// <summary>
+    /// Whether the running refresh was started by pulling the list down. The pull's own
+    /// visualizer reports that wait, so the spinner over the list stays out of its way.
+    /// </summary>
+    [ObservableProperty]
+    public partial bool IsPullRefreshing { get; set; }
+
+    /// <summary>
+    /// Whether the list itself should show that it is loading.
+    /// </summary>
+    public bool IsListLoading => IsBusy && !IsPullRefreshing;
+
+    /// <summary>
     /// Whether the selected item's body is still being fetched from its own page.
     /// </summary>
     [ObservableProperty]
@@ -610,7 +622,13 @@ public sealed partial class MainViewModel : ObservableObject
 
     partial void OnIsBusyChanged(bool value)
     {
+        OnPropertyChanged(nameof(IsListLoading));
         RefreshSelectedGroupCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnIsPullRefreshingChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsListLoading));
     }
 
     partial void OnIsContentLoadingChanged(bool value)

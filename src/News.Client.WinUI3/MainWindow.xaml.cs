@@ -96,6 +96,26 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private async void NewsRefreshRequested(RefreshContainer sender, RefreshRequestedEventArgs args)
+    {
+        // The deferral holds the visualizer in its refreshing state until the group is back,
+        // so the pull reads as the wait it started rather than snapping back on release.
+        var deferral = args.GetDeferral();
+        ViewModel.IsPullRefreshing = true;
+        try
+        {
+            if (ViewModel.RefreshSelectedGroupCommand.CanExecute(null))
+            {
+                await ViewModel.RefreshSelectedGroupCommand.ExecuteAsync(null);
+            }
+        }
+        finally
+        {
+            ViewModel.IsPullRefreshing = false;
+            deferral.Complete();
+        }
+    }
+
     private void NewsListViewRightTapped(object sender, RightTappedRoutedEventArgs e)
     {
         _contextTargetItem = (e.OriginalSource as FrameworkElement)?.DataContext as NewsItemViewModel;

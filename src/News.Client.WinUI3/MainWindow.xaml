@@ -85,134 +85,142 @@
                     </Grid.ColumnDefinitions>
 
                     <Grid Grid.Column="0">
-                        <ListView
-                            x:Name="NewsListView"
-                            Padding="8,0,8,16"
-                            ItemsSource="{Binding Source={StaticResource GroupedNewsSource}}"
-                            RightTapped="NewsListViewRightTapped"
-                            SelectionChanged="NewsSelectionChanged"
-                            SelectionMode="Single"
-                            KeyboardAcceleratorPlacementMode="Hidden">
-                            <ListView.KeyboardAccelerators>
-                                <KeyboardAccelerator
-                                    Key="C"
-                                    Invoked="CopyAsTextAcceleratorInvoked"
-                                    Modifiers="Control" />
-                            </ListView.KeyboardAccelerators>
+                        <!-- Pulling the list down past its top runs the same refresh the toolbar
+                             button does, with the pull's own visualizer standing in for the
+                             spinner over the list. -->
+                        <muxc:RefreshContainer
+                            x:Name="NewsRefreshContainer"
+                            PullDirection="TopToBottom"
+                            RefreshRequested="NewsRefreshRequested">
+                            <ListView
+                                x:Name="NewsListView"
+                                Padding="8,0,8,16"
+                                ItemsSource="{Binding Source={StaticResource GroupedNewsSource}}"
+                                RightTapped="NewsListViewRightTapped"
+                                SelectionChanged="NewsSelectionChanged"
+                                SelectionMode="Single"
+                                KeyboardAcceleratorPlacementMode="Hidden">
+                                <ListView.KeyboardAccelerators>
+                                    <KeyboardAccelerator
+                                        Key="C"
+                                        Invoked="CopyAsTextAcceleratorInvoked"
+                                        Modifiers="Control" />
+                                </ListView.KeyboardAccelerators>
 
-                            <ListView.ContextFlyout>
-                                <MenuFlyout Opening="NewsContextFlyoutOpening">
-                                    <MenuFlyoutItem
-                                        Command="{x:Bind ViewModel.CopySelectedAsTextCommand}"
-                                        KeyboardAcceleratorTextOverride="Ctrl+C"
-                                        Text="Copy as text">
-                                        <MenuFlyoutItem.Icon>
-                                            <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" Glyph="&#xE8C8;" />
-                                        </MenuFlyoutItem.Icon>
-                                    </MenuFlyoutItem>
-                                    <MenuFlyoutSeparator Visibility="{x:Bind ViewModel.CanOpenSelected, Mode=OneWay}" />
-                                    <MenuFlyoutItem
-                                        Command="{x:Bind ViewModel.CopySelectedUrlCommand}"
-                                        Text="Copy URL"
-                                        Visibility="{x:Bind ViewModel.CanOpenSelected, Mode=OneWay}">
-                                        <MenuFlyoutItem.Icon>
-                                            <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" Glyph="&#xE71B;" />
-                                        </MenuFlyoutItem.Icon>
-                                    </MenuFlyoutItem>
-                                    <MenuFlyoutItem
-                                        Command="{x:Bind ViewModel.OpenSelectedArticleCommand}"
-                                        Text="Open in browser"
-                                        Visibility="{x:Bind ViewModel.CanOpenSelected, Mode=OneWay}">
-                                        <MenuFlyoutItem.Icon>
-                                            <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" Glyph="&#xE8A7;" />
-                                        </MenuFlyoutItem.Icon>
-                                    </MenuFlyoutItem>
-                                </MenuFlyout>
-                            </ListView.ContextFlyout>
+                                <ListView.ContextFlyout>
+                                    <MenuFlyout Opening="NewsContextFlyoutOpening">
+                                        <MenuFlyoutItem
+                                            Command="{x:Bind ViewModel.CopySelectedAsTextCommand}"
+                                            KeyboardAcceleratorTextOverride="Ctrl+C"
+                                            Text="Copy as text">
+                                            <MenuFlyoutItem.Icon>
+                                                <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" Glyph="&#xE8C8;" />
+                                            </MenuFlyoutItem.Icon>
+                                        </MenuFlyoutItem>
+                                        <MenuFlyoutSeparator Visibility="{x:Bind ViewModel.CanOpenSelected, Mode=OneWay}" />
+                                        <MenuFlyoutItem
+                                            Command="{x:Bind ViewModel.CopySelectedUrlCommand}"
+                                            Text="Copy URL"
+                                            Visibility="{x:Bind ViewModel.CanOpenSelected, Mode=OneWay}">
+                                            <MenuFlyoutItem.Icon>
+                                                <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" Glyph="&#xE71B;" />
+                                            </MenuFlyoutItem.Icon>
+                                        </MenuFlyoutItem>
+                                        <MenuFlyoutItem
+                                            Command="{x:Bind ViewModel.OpenSelectedArticleCommand}"
+                                            Text="Open in browser"
+                                            Visibility="{x:Bind ViewModel.CanOpenSelected, Mode=OneWay}">
+                                            <MenuFlyoutItem.Icon>
+                                                <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" Glyph="&#xE8A7;" />
+                                            </MenuFlyoutItem.Icon>
+                                        </MenuFlyoutItem>
+                                    </MenuFlyout>
+                                </ListView.ContextFlyout>
 
-                            <ListView.ItemContainerStyle>
-                                <Style BasedOn="{StaticResource DefaultListViewItemStyle}" TargetType="ListViewItem">
-                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                                    <Setter Property="Padding" Value="12,8" />
-                                </Style>
-                            </ListView.ItemContainerStyle>
+                                <ListView.ItemContainerStyle>
+                                    <Style BasedOn="{StaticResource DefaultListViewItemStyle}" TargetType="ListViewItem">
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        <Setter Property="Padding" Value="12,8" />
+                                    </Style>
+                                </ListView.ItemContainerStyle>
 
-                            <ListView.GroupStyle>
-                                <GroupStyle>
-                                    <GroupStyle.HeaderTemplate>
-                                        <DataTemplate>
+                                <ListView.GroupStyle>
+                                    <GroupStyle>
+                                        <GroupStyle.HeaderTemplate>
+                                            <DataTemplate>
+                                                <TextBlock
+                                                    Margin="0,12,0,4"
+                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                    Style="{StaticResource BodyStrongTextBlockStyle}"
+                                                    Text="{Binding DayLabel}" />
+                                            </DataTemplate>
+                                        </GroupStyle.HeaderTemplate>
+                                    </GroupStyle>
+                                </ListView.GroupStyle>
+
+                                <ListView.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:NewsItemViewModel">
+                                        <Grid ColumnSpacing="12">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <Border
+                                                Grid.Column="0"
+                                                Width="64"
+                                                Height="64"
+                                                VerticalAlignment="Top"
+                                                Background="{ThemeResource ControlAltFillColorSecondaryBrush}"
+                                                CornerRadius="{ThemeResource ControlCornerRadius}"
+                                                Visibility="{x:Bind HasImage}">
+                                                <!-- Binding (not x:Bind) so the Uri -> ImageSource conversion happens
+                                                     per realized container and decoded bitmaps stay recyclable. -->
+                                                <Image Source="{Binding ImageUri}" Stretch="UniformToFill" />
+                                            </Border>
+
+                                            <StackPanel
+                                                Grid.Column="1"
+                                                VerticalAlignment="Center"
+                                                Spacing="4">
+                                                <!-- The two lines the search box looks through, so the two
+                                                     that show where a query matched. -->
+                                                <TextBlock
+                                                    controls:SearchHighlight.Query="{x:Bind SearchQuery}"
+                                                    MaxLines="2"
+                                                    Style="{StaticResource BodyStrongTextBlockStyle}"
+                                                    Text="{x:Bind Title}"
+                                                    TextTrimming="CharacterEllipsis"
+                                                    TextWrapping="Wrap" />
+                                                <TextBlock
+                                                    controls:SearchHighlight.Query="{x:Bind SearchQuery}"
+                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                    MaxLines="2"
+                                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                                    Text="{x:Bind Lead}"
+                                                    TextTrimming="CharacterEllipsis"
+                                                    TextWrapping="Wrap" />
+                                                <!-- Source (only in multi-source groups), views and reactions. -->
+                                                <TextBlock
+                                                    Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                                    Text="{x:Bind MetaText}"
+                                                    TextTrimming="CharacterEllipsis"
+                                                    Visibility="{x:Bind HasMeta}" />
+                                            </StackPanel>
+
                                             <TextBlock
-                                                Margin="0,12,0,4"
-                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                                Style="{StaticResource BodyStrongTextBlockStyle}"
-                                                Text="{Binding DayLabel}" />
-                                        </DataTemplate>
-                                    </GroupStyle.HeaderTemplate>
-                                </GroupStyle>
-                            </ListView.GroupStyle>
-
-                            <ListView.ItemTemplate>
-                                <DataTemplate x:DataType="vm:NewsItemViewModel">
-                                    <Grid ColumnSpacing="12">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
-
-                                        <Border
-                                            Grid.Column="0"
-                                            Width="64"
-                                            Height="64"
-                                            VerticalAlignment="Top"
-                                            Background="{ThemeResource ControlAltFillColorSecondaryBrush}"
-                                            CornerRadius="{ThemeResource ControlCornerRadius}"
-                                            Visibility="{x:Bind HasImage}">
-                                            <!-- Binding (not x:Bind) so the Uri -> ImageSource conversion happens
-                                                 per realized container and decoded bitmaps stay recyclable. -->
-                                            <Image Source="{Binding ImageUri}" Stretch="UniformToFill" />
-                                        </Border>
-
-                                        <StackPanel
-                                            Grid.Column="1"
-                                            VerticalAlignment="Center"
-                                            Spacing="4">
-                                            <!-- The two lines the search box looks through, so the two
-                                                 that show where a query matched. -->
-                                            <TextBlock
-                                                controls:SearchHighlight.Query="{x:Bind SearchQuery}"
-                                                MaxLines="2"
-                                                Style="{StaticResource BodyStrongTextBlockStyle}"
-                                                Text="{x:Bind Title}"
-                                                TextTrimming="CharacterEllipsis"
-                                                TextWrapping="Wrap" />
-                                            <TextBlock
-                                                controls:SearchHighlight.Query="{x:Bind SearchQuery}"
-                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                                MaxLines="2"
-                                                Style="{StaticResource CaptionTextBlockStyle}"
-                                                Text="{x:Bind Lead}"
-                                                TextTrimming="CharacterEllipsis"
-                                                TextWrapping="Wrap" />
-                                            <!-- Source (only in multi-source groups), views and reactions. -->
-                                            <TextBlock
+                                                Grid.Column="2"
+                                                VerticalAlignment="Top"
                                                 Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                                 Style="{StaticResource CaptionTextBlockStyle}"
-                                                Text="{x:Bind MetaText}"
-                                                TextTrimming="CharacterEllipsis"
-                                                Visibility="{x:Bind HasMeta}" />
-                                        </StackPanel>
-
-                                        <TextBlock
-                                            Grid.Column="2"
-                                            VerticalAlignment="Top"
-                                            Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                                            Style="{StaticResource CaptionTextBlockStyle}"
-                                            Text="{x:Bind TimeText}" />
-                                    </Grid>
-                                </DataTemplate>
-                            </ListView.ItemTemplate>
-                        </ListView>
+                                                Text="{x:Bind TimeText}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </muxc:RefreshContainer>
 
                         <TextBlock
                             Margin="24"
@@ -231,8 +239,8 @@
                             Height="32"
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center"
-                            IsActive="{x:Bind ViewModel.IsBusy, Mode=OneWay}"
-                            Visibility="{x:Bind ViewModel.IsBusy, Mode=OneWay}" />
+                            IsActive="{x:Bind ViewModel.IsListLoading, Mode=OneWay}"
+                            Visibility="{x:Bind ViewModel.IsListLoading, Mode=OneWay}" />
 
                         <!-- Rides over the list's top-right corner: a bare glyph until it is
                              wanted, a filter box once it is opened. -->

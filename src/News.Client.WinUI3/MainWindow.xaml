@@ -353,6 +353,16 @@
                                         Visibility="{x:Bind ViewModel.IsFormattedTextContentMode, Mode=OneWay}" />
                                 </Grid>
                             </ScrollViewer>
+
+                            <!-- Sources that pull their body from the article's own page keep the
+                                 pane on this until the page is in. -->
+                            <muxc:ProgressRing
+                                Width="32"
+                                Height="32"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                IsActive="{x:Bind ViewModel.IsContentLoading, Mode=OneWay}"
+                                Visibility="{x:Bind ViewModel.IsContentLoading, Mode=OneWay}" />
                         </Grid>
                     </Grid>
                 </Grid>

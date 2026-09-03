@@ -67,6 +67,22 @@ public partial class App : Application
                 options.Retry.MaxRetryAttempts = 3;
             });
 
+        // Article pages are heavier than a feed and are fetched while the reader waits, so this
+        // one gives an attempt longer to finish and retries it fewer times.
+        builder.Services
+            .AddHttpClient<IArticleContentClient, ArticleContentClient>(httpClient =>
+            {
+                httpClient.Timeout = TimeSpan.FromSeconds(30);
+                httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("News.Client.WinUI3/1.0");
+                httpClient.DefaultRequestHeaders.Accept.ParseAdd("text/html, application/xhtml+xml");
+            })
+            .AddStandardResilienceHandler(options =>
+            {
+                options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(15);
+                options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(30);
+                options.Retry.MaxRetryAttempts = 2;
+            });
+
         return builder.Build();
     }
 }

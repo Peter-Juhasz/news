@@ -16,7 +16,15 @@ public abstract record NewsSource(TimeSpan Frequency)
         lastLoadedAt is null || Frequency <= TimeSpan.Zero || now - lastLoadedAt.Value >= Frequency;
 }
 
-public sealed record RssNewsSource(string Url, TimeSpan Frequency) : NewsSource(Frequency);
+public sealed record RssNewsSource(string Url, TimeSpan Frequency) : NewsSource(Frequency)
+{
+    /// <summary>
+    /// CSS selector picking the article body out of the page an item links to. Optional; where it
+    /// is set, the body shown for an item is fetched from its own page instead of read from the
+    /// feed, for the feeds that publish no more than a teaser.
+    /// </summary>
+    public string? Selector { get; init; }
+}
 
 public sealed record RedditNewsSource(string Subreddit, TimeSpan Frequency) : NewsSource(Frequency)
 {

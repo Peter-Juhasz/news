@@ -14,7 +14,9 @@ public sealed partial class MainViewModel : ObservableObject
 {
     private readonly IGroupCatalog _groupCatalog;
     private readonly INewsSourceClient _newsSourceClient;
+    private readonly IArticleContentClient _articleContentClient;
     private readonly ILoggerFactory _loggerFactory;
+    private readonly ILogger<MainViewModel> _logger;
     private readonly SemaphoreSlim _selectionLock = new(1, 1);
 
     /// <summary>
@@ -25,14 +27,23 @@ public sealed partial class MainViewModel : ObservableObject
 
     private bool _initialized;
 
+    /// <summary>
+    /// Cancels the article body being fetched for the selected item; also the token the running
+    /// fetch is matched against, so a fetch overtaken by a newer selection leaves the pane alone.
+    /// </summary>
+    private CancellationTokenSource? _contentLoad;
+
     public MainViewModel(
         IGroupCatalog groupCatalog,
         INewsSourceClient newsSourceClient,
+        IArticleContentClient articleContentClient,
         ILoggerFactory loggerFactory)
     {
         _groupCatalog = groupCatalog;
         _newsSourceClient = newsSourceClient;
+        _articleContentClient = articleContentClient;
         _loggerFactory = loggerFactory;
+        _logger = loggerFactory.CreateLogger<MainViewModel>();
 
         RefreshSelectedGroupCommand = new AsyncRelayCommand(
             execute: RefreshSelectedGroupAsync,
@@ -78,6 +89,12 @@ public sealed partial class MainViewModel : ObservableObject
 
     [ObservableProperty]
     public partial bool IsBusy { get; set; }
+
+    /// <summary>
+    /// Whether the selected item's body is still being fetched from its own page.
+    /// </summary>
+    [ObservableProperty]
+    public partial bool IsContentLoading { get; set; }
 
     /// <summary>
     /// Whether the search box has taken the place of the icon button over the list.
@@ -131,7 +148,8 @@ public sealed partial class MainViewModel : ObservableObject
 
     public bool HasWebContent => SelectedUrlUri is not null;
 
-    public bool IsTextContentMode => HasSelection && SelectedContentMode == NewsContentMode.Text;
+    // The content views wait for the body being fetched; the spinner has the pane until it arrives.
+    public bool IsTextContentMode => HasSelection && !IsContentLoading && SelectedContentMode == NewsContentMode.Text;
 
     /// <summary>
     /// Text view showing HTML-looking content as native flow text.
@@ -143,7 +161,8 @@ public sealed partial class MainViewModel : ObservableObject
     /// </summary>
     public bool IsPlainTextContentMode => IsTextContentMode && !HasHtmlContent;
 
-    public bool IsHtmlContentMode => HasSelection && SelectedContentMode == NewsContentMode.Html && HasHtmlContent;
+    public bool IsHtmlContentMode =>
+        HasSelection && !IsContentLoading && SelectedContentMode == NewsContentMode.Html && HasHtmlContent;
 
     public bool IsWebContentMode => HasSelection && SelectedContentMode == NewsContentMode.Web && HasWebContent;
 
@@ -391,7 +410,73 @@ public sealed partial class MainViewModel : ObservableObject
     partial void OnSelectedItemChanged(NewsItemViewModel? value)
     {
         SelectedContentMode = ResolveContentMode(value);
+        BeginContentLoad(value);
         RaiseSelectedItemPresentationPropertiesChanged();
+    }
+
+    /// <summary>
+    /// Starts fetching the selected item's body from its own page, for the sources that name a
+    /// selector. Whatever was being fetched for the previous selection is dropped.
+    /// </summary>
+    private void BeginContentLoad(NewsItemViewModel? item)
+    {
+        _contentLoad?.Cancel();
+        _contentLoad?.Dispose();
+        _contentLoad = null;
+        IsContentLoading = false;
+
+        // A story already fetched keeps what it has, and the web view shows the page itself, so
+        // neither has anything to wait for.
+        if (item is not { HasFetchedContent: true, FetchedContent: null } ||
+            SelectedContentMode is NewsContentMode.Web)
+        {
+            return;
+        }
+
+        var load = new CancellationTokenSource();
+        _contentLoad = load;
+        IsContentLoading = true;
+
+        _ = LoadContentAsync(item, load);
+    }
+
+    private async Task LoadContentAsync(NewsItemViewModel item, CancellationTokenSource load)
+    {
+        var selector = item.ContentSelector!;
+
+        try
+        {
+            var content = await _articleContentClient.LoadAsync(item.Url, selector, load.Token);
+
+            // A page whose selector matched nothing falls back to the body the feed carried, and
+            // is marked as fetched either way so selecting the story again does not retry it.
+            item.FetchedContent = content ?? item.Content ?? string.Empty;
+        }
+        catch (OperationCanceledException) when (load.IsCancellationRequested)
+        {
+            // A newer selection owns the pane; this body is no longer wanted.
+        }
+        catch (Exception exception)
+        {
+            // A page that cannot be fetched — a failed request, a timeout, an open circuit —
+            // leaves the story on the body the feed carried, and is left unfetched so returning
+            // to it tries the page again. Nothing is worth faulting this fetch-and-forget task.
+            _logger.LogWarning(exception, "Failed to load the '{Selector}' content of {Url}.", selector, item.Url);
+        }
+        finally
+        {
+            if (ReferenceEquals(_contentLoad, load))
+            {
+                _contentLoad = null;
+                IsContentLoading = false;
+
+                // The body only arrives now, so a view that needs one is only available now.
+                SelectedContentMode = ResolveContentMode(item);
+                RaiseSelectedItemPresentationPropertiesChanged();
+            }
+
+            load.Dispose();
+        }
     }
 
     private NewsContentMode ResolveContentMode(NewsItemViewModel? item)
@@ -418,6 +503,14 @@ public sealed partial class MainViewModel : ObservableObject
     partial void OnIsBusyChanged(bool value)
     {
         RefreshSelectedGroupCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnIsContentLoadingChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsTextContentMode));
+        OnPropertyChanged(nameof(IsFormattedTextContentMode));
+        OnPropertyChanged(nameof(IsPlainTextContentMode));
+        OnPropertyChanged(nameof(IsHtmlContentMode));
     }
 
     partial void OnIsSearchOpenChanged(bool value)

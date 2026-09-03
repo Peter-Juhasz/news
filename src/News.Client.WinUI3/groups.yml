@@ -6,6 +6,10 @@ groups:
         frequency: 00:30:00
         # Optional: shown in the details pane instead of the article's host name.
         title: .NET Blog
+        # Optional, rss only: a CSS selector for the article body in the page an item links to.
+        # Where it is set, the body is fetched from that page instead of read from the feed —
+        # for the feeds that publish no more than a teaser.
+        # selector: article .entry-content
       - type: reddit
         subreddit: dotnet
         frequency: 00:15:00

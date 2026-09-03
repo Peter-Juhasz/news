@@ -43,6 +43,29 @@ public sealed class NewsItemViewModel(NewsItem item, NewsSource source, bool sho
     /// </summary>
     public NewsContentMode? View { get; } = source.View;
 
+    /// <summary>
+    /// CSS selector the source configures for picking the body out of the item's own page.
+    /// </summary>
+    public string? ContentSelector { get; } = (source as RssNewsSource)?.Selector;
+
+    /// <summary>
+    /// Whether this item's body is fetched from its page rather than taken from the feed: its
+    /// source names a selector, and there is a page to run it against.
+    /// </summary>
+    public bool HasFetchedContent => ContentSelector is not null && UrlUri is not null;
+
+    /// <summary>
+    /// Body fetched from the item's own page, kept so returning to this story shows it again
+    /// without downloading the page a second time.
+    /// </summary>
+    public string? FetchedContent { get; set; }
+
+    /// <summary>
+    /// Body the reading pane shows: the one fetched from the page where there is one, and the
+    /// feed's own otherwise.
+    /// </summary>
+    public string? DisplayContent => FetchedContent ?? Content;
+
     public bool HasImage => ImageUri is not null;
 
     public string ViewsText => Views is { } views ? $"{FormatCount(views)} views" : string.Empty;
@@ -74,9 +97,9 @@ public sealed class NewsItemViewModel(NewsItem item, NewsSource source, bool sho
         Title.Contains(query, StringComparison.CurrentCultureIgnoreCase)
         || Lead.Contains(query, StringComparison.CurrentCultureIgnoreCase);
 
-    public string PlainContent => HtmlUtility.ToPlainText(Content);
+    public string PlainContent => HtmlUtility.ToPlainText(DisplayContent);
 
-    public string? HtmlContent => HtmlUtility.LooksLikeHtml(Content) ? Content : null;
+    public string? HtmlContent => HtmlUtility.LooksLikeHtml(DisplayContent) ? DisplayContent : null;
 
     /// <summary>Joins the metadata parts that have something to say, dropping the empty ones.</summary>
     public static string Join(params string?[] parts) =>

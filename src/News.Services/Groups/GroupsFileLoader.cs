@@ -62,7 +62,8 @@ public sealed class GroupsFileLoader
                 Frequency: source.Frequency)
             {
                 Title = title,
-                View = view
+                View = view,
+                Selector = string.IsNullOrWhiteSpace(source.Selector) ? null : source.Selector.Trim()
             },
             "reddit" => new RedditNewsSource(
                 Subreddit: RequireValue(source.Subreddit, "subreddit", groupTitle),
@@ -137,5 +138,7 @@ public sealed class GroupsFileLoader
         public string? Title { get; init; }
 
         public string? View { get; init; }
+
+        public string? Selector { get; init; }
     }
 }

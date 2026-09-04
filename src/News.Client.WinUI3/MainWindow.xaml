@@ -357,13 +357,20 @@
                             <muxc:WebView2 x:Name="BrowserWebView" Visibility="{x:Bind ViewModel.IsWebContentMode, Mode=OneWay}" />
 
                             <!-- Declared last so it sits above the WebView2 layers and receives the
-                                 pointer wheel while the text view is showing. -->
-                            <ScrollViewer
-                                x:Name="TextContentScrollViewer"
-                                HorizontalScrollBarVisibility="Disabled"
-                                HorizontalScrollMode="Disabled"
+                                 pointer wheel while the text view is showing.
+
+                                 ScrollView rather than ScrollViewer: the older control drives wheel
+                                 scrolling through DirectManipulation, which in a long-running window
+                                 can lose sync with what is drawn — the thumb travels while the text
+                                 stays put, and only dragging the thumb still moves it. ScrollView
+                                 scrolls through InteractionTracker instead and has no such split.
+                                 ContentOrientation="Vertical" (the default) is what the old
+                                 Horizontal*="Disabled" pair said: constrain the width, grow down. -->
+                            <muxc:ScrollView
+                                x:Name="TextContentScrollView"
+                                ContentOrientation="Vertical"
+                                HorizontalScrollBarVisibility="Hidden"
                                 VerticalScrollBarVisibility="Auto"
-                                VerticalScrollMode="Enabled"
                                 Visibility="{x:Bind ViewModel.IsTextContentMode, Mode=OneWay}">
                                 <Grid>
                                     <TextBlock
@@ -379,7 +386,7 @@
                                         Html="{x:Bind ViewModel.SelectedHtmlContent, Mode=OneWay}"
                                         Visibility="{x:Bind ViewModel.IsFormattedTextContentMode, Mode=OneWay}" />
                                 </Grid>
-                            </ScrollViewer>
+                            </muxc:ScrollView>
 
                             <!-- Sources that pull their body from the article's own page keep the
                                  pane on this until the page is in. -->

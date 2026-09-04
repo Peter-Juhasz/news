@@ -104,6 +104,15 @@ public sealed class NewsGroupViewModel(
         }
     }
 
+    /// <summary>
+    /// The stories every source of the group is holding, as one list — a story carried by more
+    /// than one of them appearing once, under the source that carries it most recently.
+    /// </summary>
+    /// <remarks>
+    /// Ordered by date, and then by key so that stories published at the same moment come back
+    /// in the same order every time. Without that, two loads carrying the very same stories
+    /// could still hand the list a different order to apply.
+    /// </remarks>
     public IReadOnlyList<SourcedNewsItem> GetMergedItems()
     {
         var merged = new Dictionary<string, SourcedNewsItem>(StringComparer.OrdinalIgnoreCase);
@@ -112,8 +121,8 @@ public sealed class NewsGroupViewModel(
         {
             foreach (var item in state.Items)
             {
-                var key = string.IsNullOrWhiteSpace(item.Id) ? item.Url : item.Id;
-                if (key is null)
+                var key = item.Key;
+                if (key.Length == 0)
                 {
                     continue;
                 }
@@ -128,6 +137,7 @@ public sealed class NewsGroupViewModel(
         return merged
             .Values
             .OrderByDescending(entry => entry.Item.Date)
+            .ThenBy(entry => entry.Item.Key, StringComparer.Ordinal)
             .ToList();
     }
 

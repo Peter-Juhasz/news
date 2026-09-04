@@ -14,12 +14,19 @@ namespace News.Client.WinUI3;
 
 public sealed partial class MainWindow : Window
 {
+    /// <summary>
+    /// How far down the list still counts as being at the top of it. A hair above zero, so a
+    /// list resting at the top after an inertial scroll is not read as having been scrolled.
+    /// </summary>
+    private const double TopOfListThreshold = 1;
+
     private bool _isWebViewReady;
     private bool _isBrowserWebViewReady;
     private bool _isSyncingNavigationSelection;
     private bool _isSyncingListSelection;
     private Uri? _browserNavigatedUri;
     private NewsItemViewModel? _contextTargetItem;
+    private ScrollViewer? _newsScrollViewer;
 
     public MainWindow(MainViewModel viewModel)
     {
@@ -45,6 +52,8 @@ public sealed partial class MainWindow : Window
         {
             GroupsNavigationView.SelectedItem = ViewModel.Groups[0];
         }
+
+        WatchNewsScrolling();
     }
 
     private async void GroupsNavigationViewSelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
@@ -69,12 +78,59 @@ public sealed partial class MainWindow : Window
 
     private void NewsSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_isSyncingListSelection)
+        // A list taking rows in and out drops its own selection along the way and says so, which
+        // is the list keeping up rather than the reader choosing. The view model settles the
+        // selection itself once it has finished, and says so again.
+        if (_isSyncingListSelection || ViewModel.IsUpdatingList)
         {
             return;
         }
 
         ViewModel.SelectedItem = NewsListView.SelectedItem as NewsItemViewModel;
+    }
+
+    private void NewsListViewLoaded(object sender, RoutedEventArgs e) => WatchNewsScrolling();
+
+    /// <summary>
+    /// Starts following where the reader is in the list. Called again once the first group is
+    /// in, for the case where the list had no template to find its scroller in yet.
+    /// </summary>
+    private void WatchNewsScrolling()
+    {
+        if (_newsScrollViewer is not null)
+        {
+            return;
+        }
+
+        _newsScrollViewer = FindDescendant<ScrollViewer>(NewsListView);
+        if (_newsScrollViewer is null)
+        {
+            return;
+        }
+
+        _newsScrollViewer.ViewChanged += NewsScrollViewChanged;
+        UpdateItemsUpdatingScrollMode();
+    }
+
+    private void NewsScrollViewChanged(object? sender, ScrollViewerViewChangedEventArgs e) =>
+        UpdateItemsUpdatingScrollMode();
+
+    /// <summary>
+    /// Decides what the list does with the reader's place when rows arrive above it. A reader at
+    /// the top is left at the top, so the stories that came in are the first thing they see. A
+    /// reader who has scrolled down keeps the row they were on, rather than having it pushed
+    /// away by whatever arrived over it.
+    /// </summary>
+    private void UpdateItemsUpdatingScrollMode()
+    {
+        if (_newsScrollViewer is null || NewsListView.ItemsPanelRoot is not ItemsStackPanel itemsPanel)
+        {
+            return;
+        }
+
+        itemsPanel.ItemsUpdatingScrollMode = _newsScrollViewer.VerticalOffset <= TopOfListThreshold
+            ? ItemsUpdatingScrollMode.KeepScrollOffset
+            : ItemsUpdatingScrollMode.KeepItemsInView;
     }
 
     private void SyncListSelection()

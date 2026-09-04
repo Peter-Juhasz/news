@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
+using News.Collections;
 using News.Domain;
 using News.Groups;
 using News.Services;
@@ -31,10 +32,24 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly SemaphoreSlim _selectionLock = new(1, 1);
 
     /// <summary>
+    /// How row keys are compared, everywhere a story is looked up by the one it carries. The
+    /// same comparison the group merges its sources under, so two sources agreeing on a story
+    /// but not on the case of its identifier still count as carrying the one story.
+    /// </summary>
+    private static readonly StringComparer KeyComparer = StringComparer.OrdinalIgnoreCase;
+
+    /// <summary>
     /// Every row of the selected group, before the search text narrows it down. Held so typing
     /// re-groups this list instead of merging the group's sources again on each keystroke.
     /// </summary>
     private readonly List<NewsItemViewModel> _items = [];
+
+    /// <summary>
+    /// The rows of <see cref="_items"/> by the story each of them shows, so a story a later load
+    /// returns again is handed to the row it already has instead of being given a second one.
+    /// This is what the list is updated rather than rebuilt on.
+    /// </summary>
+    private readonly Dictionary<string, NewsItemViewModel> _itemsByKey = new(KeyComparer);
 
     /// <summary>
     /// Every keystroke in the search box, on its way to <see cref="ApplyQuery"/>.
@@ -108,6 +123,14 @@ public sealed partial class MainViewModel : ObservableObject
     public ObservableCollection<NewsGroupViewModel> Groups { get; } = [];
 
     public ObservableCollection<NewsDayGroupViewModel> DayGroups { get; } = [];
+
+    /// <summary>
+    /// Whether the day groups are being brought in line with what the list should show. A list
+    /// drops its own selection the moment the selected row is taken out of it, and says so; that
+    /// is the list keeping up rather than the reader choosing, and is not worth listening to
+    /// while it happens — the selection is settled once, at the end.
+    /// </summary>
+    public bool IsUpdatingList { get; private set; }
 
     public IAsyncRelayCommand RefreshSelectedGroupCommand { get; }
 
@@ -250,9 +273,12 @@ public sealed partial class MainViewModel : ObservableObject
         SelectedGroup = group;
         IsBusy = true;
 
-        // A query typed against the previous group says nothing about this one.
-        CloseSearch();
-        RebuildItems(group);
+        // A query typed against the previous group says nothing about this one. The list is not
+        // rebuilt for the emptied box: the rows of this group replace it outright a line later.
+        ClearSearchBox();
+        _appliedQuery = string.Empty;
+
+        RebuildItems(group, reset: true);
 
         await _selectionLock.WaitAsync(cancellationToken);
         try
@@ -382,10 +408,10 @@ public sealed partial class MainViewModel : ObservableObject
         }
 
         SelectedGroup = null;
-        CloseSearch();
-        _items.Clear();
-        DayGroups.Clear();
-        SelectedItem = null;
+        ClearSearchBox();
+        _appliedQuery = string.Empty;
+        DiscardItems();
+        RebuildDayGroups(reset: true);
     }
 
     /// <summary>
@@ -443,58 +469,134 @@ public sealed partial class MainViewModel : ObservableObject
         }
     }
 
-    private void RebuildItems(NewsGroupViewModel newsGroup)
+    /// <summary>
+    /// Brings the rows in line with what the group is holding. A story the group returned again
+    /// is handed to the row it already has, so the row — and the place it holds in the list —
+    /// survives the load.
+    /// </summary>
+    /// <param name="reset">Whether to start from nothing rather than from the rows on screen.
+    /// Set where the next list has nothing to do with this one, which is another group or a
+    /// changed configuration: there is no point diffing against rows that are all about to go.</param>
+    private void RebuildItems(NewsGroupViewModel newsGroup, bool reset = false)
     {
+        if (reset)
+        {
+            DiscardItems();
+        }
+
         // Only a group merging several sources needs each row to name the one it came from.
         var showSourceName = newsGroup.HasMultipleSources;
+        var selectedItemChanged = false;
 
         _items.Clear();
-        _items.AddRange(newsGroup
-            .GetMergedItems()
-            .Select(entry => new NewsItemViewModel(entry.Item, entry.Source, showSourceName)));
 
-        RebuildDayGroups();
+        foreach (var entry in newsGroup.GetMergedItems())
+        {
+            if (_itemsByKey.TryGetValue(entry.Item.Key, out var listed))
+            {
+                selectedItemChanged |= listed.Update(entry.Item, entry.Source, showSourceName) &&
+                                       ReferenceEquals(listed, SelectedItem);
+                _items.Add(listed);
+                continue;
+            }
+
+            _items.Add(new NewsItemViewModel(entry.Item, entry.Source, showSourceName));
+        }
+
+        // Filled again from the rows there are now, so a story its source stopped carrying does
+        // not keep a row alive for a later load to find.
+        _itemsByKey.Clear();
+        foreach (var item in _items)
+        {
+            _itemsByKey[item.Key] = item;
+        }
+
+        RebuildDayGroups(reset);
+
+        // The pane is drawn from the selected row, and that row was handed a newer story.
+        if (selectedItemChanged)
+        {
+            RaiseSelectedItemPresentationPropertiesChanged();
+        }
     }
 
     /// <summary>
-    /// Groups the items the search text lets through into the days the list shows, keeping the
-    /// reading pane on the selected story while it is still listed and handing it the first row
-    /// when it is not.
+    /// Drops every row, so the next build starts from nothing.
     /// </summary>
-    private void RebuildDayGroups()
+    private void DiscardItems()
     {
-        var selectedUrl = SelectedItem?.Url;
+        _items.Clear();
+        _itemsByKey.Clear();
+    }
+
+    /// <summary>
+    /// Brings the day groups in line with the rows the search text lets through, applying the
+    /// difference rather than replacing them — a row that is still listed keeps the container it
+    /// is drawn in, and with it the reader's place in the list.
+    /// </summary>
+    private void RebuildDayGroups(bool reset = false)
+    {
         var query = _appliedQuery.Length > 0 ? _appliedQuery : null;
 
-        // The rows read this as they are built, which is what marks the matched words in them.
+        // The rows watch this, which is what marks the matched words in them.
         foreach (var item in _items)
         {
             item.SearchQuery = query;
         }
 
-        var groupedItems = _items
+        var days = _items
             .Where(item => query is null || item.Matches(query))
             .GroupBy(item => DateOnly.FromDateTime(item.Date.LocalDateTime.Date))
-            .OrderByDescending(group => group.Key);
+            .OrderByDescending(day => day.Key)
+            .Select(day => new ListedDay(
+                day.Key,
+                // Ordered by key after date, so stories published at the same moment are put in
+                // the same order every time and the list is not asked to shuffle them about.
+                [.. day.OrderByDescending(item => item.Date).ThenBy(item => item.Key, StringComparer.Ordinal)]))
+            .ToList();
 
-        DayGroups.Clear();
-        NewsItemViewModel? selectedCandidate = null;
-
-        foreach (var group in groupedItems)
+        IsUpdatingList = true;
+        try
         {
-            var dayGroup = new NewsDayGroupViewModel(group.Key, group.OrderByDescending(item => item.Date));
-            DayGroups.Add(dayGroup);
-
-            if (selectedCandidate is null && selectedUrl is not null)
+            if (reset)
             {
-                selectedCandidate = dayGroup.FirstOrDefault(item =>
-                    string.Equals(item.Url, selectedUrl, StringComparison.OrdinalIgnoreCase));
+                DayGroups.Clear();
             }
+
+            ObservableListReconciler.Reconcile(
+                DayGroups,
+                days,
+                static dayGroup => dayGroup.Day,
+                static day => day.Day,
+                create: static day => new NewsDayGroupViewModel(day.Day, day.Items),
+                update: static (dayGroup, day) =>
+                    ObservableListReconciler.Reconcile(dayGroup, day.Items, static item => item.Key, KeyComparer));
+        }
+        finally
+        {
+            IsUpdatingList = false;
         }
 
-        SelectedItem = selectedCandidate ?? DayGroups.SelectMany(group => group).FirstOrDefault();
+        UpdateSelection();
 
         OnPropertyChanged(nameof(HasNoMatches));
+    }
+
+    /// <summary>
+    /// Keeps the reading pane on the selected story while it is still listed, and hands it the
+    /// first row when it is not.
+    /// </summary>
+    private void UpdateSelection()
+    {
+        var selected = SelectedItem;
+        var isListed = selected is not null && DayGroups.Any(day => day.Contains(selected));
+
+        SelectedItem = isListed ? selected : DayGroups.FirstOrDefault()?.FirstOrDefault();
+
+        // A list drops its own selection when the selected row is taken out of it, and refuses
+        // one made for a row it does not hold yet. Either way it is told again what is selected,
+        // now that it holds every row it is going to.
+        OnPropertyChanged(nameof(SelectedItem));
     }
 
     /// <summary>
@@ -514,12 +616,20 @@ public sealed partial class MainViewModel : ObservableObject
 
     private void CloseSearch()
     {
-        SearchText = string.Empty;
-        IsSearchOpen = false;
+        ClearSearchBox();
 
         // Closing the box is a decision, not typing: the list is whole again at once rather
         // than a throttle window later.
         ApplyQuery(string.Empty);
+    }
+
+    /// <summary>
+    /// Empties the search box and puts it away, without the list being rebuilt for it.
+    /// </summary>
+    private void ClearSearchBox()
+    {
+        SearchText = string.Empty;
+        IsSearchOpen = false;
     }
 
     partial void OnSelectedGroupChanged(NewsGroupViewModel? value)
@@ -677,4 +787,10 @@ public sealed partial class MainViewModel : ObservableObject
         CopySelectedAsTextCommand.NotifyCanExecuteChanged();
         CopySelectedUrlCommand.NotifyCanExecuteChanged();
     }
+
+    /// <summary>
+    /// One day of the list as it should be, before the day the list holds is brought in line
+    /// with it.
+    /// </summary>
+    private sealed record ListedDay(DateOnly Day, IReadOnlyList<NewsItemViewModel> Items);
 }

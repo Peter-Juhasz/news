@@ -96,10 +96,23 @@
                                 x:Name="NewsListView"
                                 Padding="8,0,8,16"
                                 ItemsSource="{Binding Source={StaticResource GroupedNewsSource}}"
+                                Loaded="NewsListViewLoaded"
                                 RightTapped="NewsListViewRightTapped"
                                 SelectionChanged="NewsSelectionChanged"
                                 SelectionMode="Single"
                                 KeyboardAcceleratorPlacementMode="Hidden">
+                                <ListView.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <!-- Stories that came in while the reader was at the top of
+                                             the list are what they should see there, so the list
+                                             keeps its offset rather than scrolling down to keep the
+                                             row that used to be first. A reader who has scrolled
+                                             away is switched back to keeping their own row in view;
+                                             see MainWindow.xaml.cs. -->
+                                        <ItemsStackPanel ItemsUpdatingScrollMode="KeepScrollOffset" />
+                                    </ItemsPanelTemplate>
+                                </ListView.ItemsPanel>
+
                                 <ListView.KeyboardAccelerators>
                                     <KeyboardAccelerator
                                         Key="C"
@@ -174,7 +187,7 @@
                                                 VerticalAlignment="Top"
                                                 Background="{ThemeResource ControlAltFillColorSecondaryBrush}"
                                                 CornerRadius="{ThemeResource ControlCornerRadius}"
-                                                Visibility="{x:Bind HasImage}">
+                                                Visibility="{x:Bind HasImage, Mode=OneWay}">
                                                 <!-- Binding (not x:Bind) so the Uri -> ImageSource conversion happens
                                                      per realized container and decoded bitmaps stay recyclable. -->
                                                 <Image Source="{Binding ImageUri}" Stretch="UniformToFill" />
@@ -185,29 +198,31 @@
                                                 VerticalAlignment="Center"
                                                 Spacing="4">
                                                 <!-- The two lines the search box looks through, so the two
-                                                     that show where a query matched. -->
+                                                     that show where a query matched. Watched rather than
+                                                     read once: a row stays in the list as the query and
+                                                     the story it shows change under it. -->
                                                 <TextBlock
-                                                    controls:SearchHighlight.Query="{x:Bind SearchQuery}"
+                                                    controls:SearchHighlight.Query="{x:Bind SearchQuery, Mode=OneWay}"
                                                     MaxLines="2"
                                                     Style="{StaticResource BodyStrongTextBlockStyle}"
-                                                    Text="{x:Bind Title}"
+                                                    Text="{x:Bind Title, Mode=OneWay}"
                                                     TextTrimming="CharacterEllipsis"
                                                     TextWrapping="Wrap" />
                                                 <TextBlock
-                                                    controls:SearchHighlight.Query="{x:Bind SearchQuery}"
+                                                    controls:SearchHighlight.Query="{x:Bind SearchQuery, Mode=OneWay}"
                                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                                     MaxLines="2"
                                                     Style="{StaticResource CaptionTextBlockStyle}"
-                                                    Text="{x:Bind Lead}"
+                                                    Text="{x:Bind Lead, Mode=OneWay}"
                                                     TextTrimming="CharacterEllipsis"
                                                     TextWrapping="Wrap" />
                                                 <!-- Source (only in multi-source groups), views and reactions. -->
                                                 <TextBlock
                                                     Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                                     Style="{StaticResource CaptionTextBlockStyle}"
-                                                    Text="{x:Bind MetaText}"
+                                                    Text="{x:Bind MetaText, Mode=OneWay}"
                                                     TextTrimming="CharacterEllipsis"
-                                                    Visibility="{x:Bind HasMeta}" />
+                                                    Visibility="{x:Bind HasMeta, Mode=OneWay}" />
                                             </StackPanel>
 
                                             <TextBlock
@@ -215,7 +230,7 @@
                                                 VerticalAlignment="Top"
                                                 Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                                 Style="{StaticResource CaptionTextBlockStyle}"
-                                                Text="{x:Bind TimeText}" />
+                                                Text="{x:Bind TimeText, Mode=OneWay}" />
                                         </Grid>
                                     </DataTemplate>
                                 </ListView.ItemTemplate>

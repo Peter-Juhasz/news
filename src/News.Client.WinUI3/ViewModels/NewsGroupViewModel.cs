@@ -10,7 +10,7 @@ public sealed class NewsGroupViewModel(
     NewsGroup group,
     INewsSourceClient newsSourceClient,
     INewsItemStore newsItemStore,
-    ILogger<NewsGroupViewModel> logger)
+    ILogger<NewsGroupViewModel> logger) : NewsGroupViewModelBase
 {
     private readonly Dictionary<NewsSource, SourceCacheState> _sourceStates = group.Sources.ToDictionary(
         keySelector: source => source,
@@ -18,12 +18,14 @@ public sealed class NewsGroupViewModel(
 
     public NewsGroup Group { get; } = group;
 
-    public string Title => Group.Title;
+    public override string Title => Group.Title;
 
     /// <summary>
     /// Whether the group merges more than one source, so items are worth labelling with theirs.
     /// </summary>
-    public bool HasMultipleSources => Group.Sources.Count > 1;
+    public override bool HasMultipleSources => Group.Sources.Count > 1;
+
+    public override bool CanRefresh => true;
 
     public IReadOnlyDictionary<NewsSource, DateTimeOffset?> SourceLastLoadedAt =>
         _sourceStates.ToDictionary(
@@ -35,7 +37,7 @@ public sealed class NewsGroupViewModel(
     /// shows those the moment the group is opened rather than staying empty until the sources are
     /// fetched again. Sources already loaded in this session keep what they have.
     /// </summary>
-    public async Task RestoreAsync(CancellationToken cancellationToken)
+    public override async Task RestoreAsync(CancellationToken cancellationToken)
     {
         var snapshot = await newsItemStore.LoadAsync(Group.Title, cancellationToken);
         if (snapshot is null)
@@ -67,7 +69,7 @@ public sealed class NewsGroupViewModel(
         }
     }
 
-    public async Task RefreshStaleAsync(CancellationToken cancellationToken)
+    public override async Task RefreshStaleAsync(CancellationToken cancellationToken)
     {
         var now = DateTimeOffset.UtcNow;
         var loadedAnySource = false;
@@ -89,7 +91,7 @@ public sealed class NewsGroupViewModel(
         }
     }
 
-    public async Task RefreshAllAsync(CancellationToken cancellationToken)
+    public override async Task RefreshAllAsync(CancellationToken cancellationToken)
     {
         var loadedAnySource = false;
 
@@ -113,7 +115,7 @@ public sealed class NewsGroupViewModel(
     /// in the same order every time. Without that, two loads carrying the very same stories
     /// could still hand the list a different order to apply.
     /// </remarks>
-    public IReadOnlyList<SourcedNewsItem> GetMergedItems()
+    public override IReadOnlyList<SourcedNewsItem> GetMergedItems()
     {
         var merged = new Dictionary<string, SourcedNewsItem>(StringComparer.OrdinalIgnoreCase);
 

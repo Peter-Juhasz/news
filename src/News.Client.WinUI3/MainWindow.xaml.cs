@@ -63,7 +63,7 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        if (args.SelectedItem is not NewsGroupViewModel selectedGroup)
+        if (args.SelectedItem is not NewsGroupViewModelBase selectedGroup)
         {
             return;
         }
@@ -154,6 +154,13 @@ public sealed partial class MainWindow : Window
 
     private async void NewsRefreshRequested(RefreshContainer sender, RefreshRequestedEventArgs args)
     {
+        // The bookmarks list reads no feeds, so pulling it down should not look as though it
+        // were fetching something. Returning without a deferral lets the visualizer go at once.
+        if (!ViewModel.CanRefreshSelectedGroup)
+        {
+            return;
+        }
+
         // The deferral holds the visualizer in its refreshing state until the group is back,
         // so the pull reads as the wait it started rather than snapping back on release.
         var deferral = args.GetDeferral();

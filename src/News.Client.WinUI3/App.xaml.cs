@@ -3,8 +3,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
+using News.Bookmarks;
 using News.Client.WinUI3.ViewModels;
 using News.Configuration;
+
 using News.Groups;
 using News.Services;
 using News.Storage;
@@ -55,6 +57,8 @@ public partial class App : Application
         builder.Services.AddSingleton<IGroupCatalog, GroupCatalog>();
         builder.Services.AddSingleton<INewsSourceClient, NewsSourceClient>();
         builder.Services.AddSingleton<INewsItemStore, NewsItemStore>();
+        builder.Services.AddSingleton<IBookmarkStore, BookmarkStore>();
+        builder.Services.AddSingleton<IBookmarkService, BookmarkService>();
 
         builder.Services
             .AddHttpClient<IRssFeedClient, RssFeedClient>(httpClient =>

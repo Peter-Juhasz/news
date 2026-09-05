@@ -1,7 +1,9 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
+using News.Bookmarks;
 using News.Collections;
+
 using News.Domain;
 using News.Groups;
 using News.Services;
@@ -30,6 +32,13 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<MainViewModel> _logger;
     private readonly SemaphoreSlim _selectionLock = new(1, 1);
+    private readonly IBookmarkService _bookmarkService;
+
+    /// <summary>
+    /// The bookmarks, as an entry in the group bar of its own. Held here rather than rebuilt
+    /// along with the rest of the bar, so what it holds survives the groups file being edited.
+    /// </summary>
+    private readonly BookmarksGroupViewModel _bookmarksGroup;
 
     /// <summary>
     /// How row keys are compared, everywhere a story is looked up by the one it carries. The
@@ -75,18 +84,24 @@ public sealed partial class MainViewModel : ObservableObject
         INewsSourceClient newsSourceClient,
         IArticleContentClient articleContentClient,
         INewsItemStore newsItemStore,
+        IBookmarkService bookmarkService,
         ILoggerFactory loggerFactory)
+
     {
         _groupCatalog = groupCatalog;
         _newsSourceClient = newsSourceClient;
         _articleContentClient = articleContentClient;
         _newsItemStore = newsItemStore;
+        _bookmarkService = bookmarkService;
         _loggerFactory = loggerFactory;
         _logger = loggerFactory.CreateLogger<MainViewModel>();
 
+        _bookmarksGroup = new BookmarksGroupViewModel(bookmarkService, groupCatalog);
+        _bookmarkService.Changed += OnBookmarksChanged;
+
         RefreshSelectedGroupCommand = new AsyncRelayCommand(
             execute: RefreshSelectedGroupAsync,
-            canExecute: () => SelectedGroup is not null && !IsBusy);
+            canExecute: () => CanRefreshSelectedGroup && !IsBusy);
 
         OpenSelectedArticleCommand = new AsyncRelayCommand(
             execute: OpenSelectedArticleAsync,
@@ -101,6 +116,10 @@ public sealed partial class MainViewModel : ObservableObject
             canExecute: () => CanOpenSelected);
 
         CloseSearchCommand = new RelayCommand(execute: CloseSearch);
+
+        ToggleSelectedBookmarkCommand = new AsyncRelayCommand(
+            execute: ToggleSelectedBookmarkAsync,
+            canExecute: () => HasSelection);
 
         // Filtering walks every loaded item, so the text is only applied once typing settles,
         // and only when it settles on something other than the query already showing —
@@ -120,7 +139,7 @@ public sealed partial class MainViewModel : ObservableObject
             .Subscribe(ApplyQuery);
     }
 
-    public ObservableCollection<NewsGroupViewModel> Groups { get; } = [];
+    public ObservableCollection<NewsGroupViewModelBase> Groups { get; } = [];
 
     public ObservableCollection<NewsDayGroupViewModel> DayGroups { get; } = [];
 
@@ -142,8 +161,10 @@ public sealed partial class MainViewModel : ObservableObject
 
     public IRelayCommand CloseSearchCommand { get; }
 
+    public IAsyncRelayCommand ToggleSelectedBookmarkCommand { get; }
+
     [ObservableProperty]
-    public partial NewsGroupViewModel? SelectedGroup { get; set; }
+    public partial NewsGroupViewModelBase? SelectedGroup { get; set; }
 
     [ObservableProperty]
     public partial NewsItemViewModel? SelectedItem { get; set; }
@@ -246,6 +267,24 @@ public sealed partial class MainViewModel : ObservableObject
 
     public bool CanOpenSelected => SelectedUrlUri is not null;
 
+    /// <summary>
+    /// Whether the selected entry has anything to fetch. The bookmarks list has not, so neither
+    /// the refresh button nor the pull gesture does anything while it is the one being browsed.
+    /// </summary>
+    public bool CanRefreshSelectedGroup => SelectedGroup is { CanRefresh: true };
+
+    /// <summary>
+    /// Whether the selected story is one of those set aside to come back to.
+    /// </summary>
+    public bool IsSelectedBookmarked => SelectedItem is { } item && _bookmarkService.IsBookmarked(item.Key);
+
+    /// <summary>
+    /// The star over the reading pane: filled while the story is kept, hollow while it is not.
+    /// </summary>
+    public string BookmarkGlyph => IsSelectedBookmarked ? "\uE735" : "\uE734";
+
+    public string BookmarkToolTip => IsSelectedBookmarked ? "Remove bookmark" : "Bookmark";
+
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         if (_initialized)
@@ -253,8 +292,13 @@ public sealed partial class MainViewModel : ObservableObject
             return;
         }
 
+        // Read before the bar is built, so the bookmarks entry is holding its stories the first
+        // time it is navigated to.
+        await _bookmarkService.InitializeAsync(cancellationToken);
+
         await _groupCatalog.InitializeAsync(cancellationToken);
         _groupCatalog.GroupsChanged += OnGroupsChanged;
+
         var addedGroups = ApplyGroups(_groupCatalog.CurrentGroups);
 
         // Sources are not fetched here: the view navigates to the first group once it is
@@ -265,7 +309,7 @@ public sealed partial class MainViewModel : ObservableObject
         _initialized = true;
     }
 
-    public async Task SelectGroupAsync(NewsGroupViewModel group, CancellationToken cancellationToken = default)
+    public async Task SelectGroupAsync(NewsGroupViewModelBase group, CancellationToken cancellationToken = default)
     {
         // The list switches to the new group before anything is awaited, so the previous
         // group's items never linger on screen while this one loads. Whatever this group has
@@ -308,7 +352,7 @@ public sealed partial class MainViewModel : ObservableObject
         }
     }
 
-    private bool IsStillSelected(NewsGroupViewModel group) => ReferenceEquals(SelectedGroup, group);
+    private bool IsStillSelected(NewsGroupViewModelBase group) => ReferenceEquals(SelectedGroup, group);
 
     private bool IsContentModeAvailable(NewsContentMode mode) => mode switch
     {
@@ -357,7 +401,42 @@ public sealed partial class MainViewModel : ObservableObject
         await Launcher.LaunchUriAsync(SelectedUrlUri);
     }
 
+    private async Task ToggleSelectedBookmarkAsync()
+    {
+        if (SelectedItem is not { } item)
+        {
+            return;
+        }
+
+        // The story and its source are kept as they are here: the source so the bookmark still
+        // knows where it was read from once that source is edited or dropped, the story so it
+        // survives the feed no longer carrying it.
+        await _bookmarkService.ToggleAsync(item.Item, item.Source, CancellationToken.None);
+    }
+
+    /// <summary>
+    /// Follows a story being kept or let go of: the star over the reading pane says which it is
+    /// now, and the bookmarks list is brought in line where it is the one being browsed.
+    /// </summary>
+    private void OnBookmarksChanged(object? sender, EventArgs e)
+    {
+        RaiseBookmarkStateChanged();
+
+        if (IsStillSelected(_bookmarksGroup))
+        {
+            RebuildItems(_bookmarksGroup);
+        }
+    }
+
+    private void RaiseBookmarkStateChanged()
+    {
+        OnPropertyChanged(nameof(IsSelectedBookmarked));
+        OnPropertyChanged(nameof(BookmarkGlyph));
+        OnPropertyChanged(nameof(BookmarkToolTip));
+    }
+
     private void CopySelectedAsText()
+
     {
         if (SelectedItem is not { } item)
         {
@@ -421,7 +500,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// </summary>
     private List<NewsGroupViewModel> ApplyGroups(IReadOnlyList<NewsGroup> groups)
     {
-        var currentByGroup = Groups.ToDictionary(vm => vm.Group, vm => vm);
+        var currentByGroup = Groups.OfType<NewsGroupViewModel>().ToDictionary(vm => vm.Group, vm => vm);
         var addedGroups = new List<NewsGroupViewModel>();
         Groups.Clear();
 
@@ -443,13 +522,18 @@ public sealed partial class MainViewModel : ObservableObject
             addedGroups.Add(addedGroup);
         }
 
+        // Last in the bar, after the reader's own groups, so the app still opens on the first of
+        // those rather than on the bookmarks.
+        Groups.Add(_bookmarksGroup);
+
         RefreshSelectedGroupCommand.NotifyCanExecuteChanged();
         return addedGroups;
+
     }
 
     private async Task RestoreAndSelectGroupAsync(
         IReadOnlyList<NewsGroupViewModel> groupsToRestore,
-        NewsGroupViewModel groupToSelect)
+        NewsGroupViewModelBase groupToSelect)
     {
         await RestoreGroupsAsync(groupsToRestore, CancellationToken.None);
         await SelectGroupAsync(groupToSelect);
@@ -477,7 +561,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// <param name="reset">Whether to start from nothing rather than from the rows on screen.
     /// Set where the next list has nothing to do with this one, which is another group or a
     /// changed configuration: there is no point diffing against rows that are all about to go.</param>
-    private void RebuildItems(NewsGroupViewModel newsGroup, bool reset = false)
+    private void RebuildItems(NewsGroupViewModelBase newsGroup, bool reset = false)
     {
         if (reset)
         {
@@ -632,8 +716,9 @@ public sealed partial class MainViewModel : ObservableObject
         IsSearchOpen = false;
     }
 
-    partial void OnSelectedGroupChanged(NewsGroupViewModel? value)
+    partial void OnSelectedGroupChanged(NewsGroupViewModelBase? value)
     {
+        OnPropertyChanged(nameof(CanRefreshSelectedGroup));
         RefreshSelectedGroupCommand.NotifyCanExecuteChanged();
     }
 
@@ -783,9 +868,12 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(IsHtmlContentMode));
         OnPropertyChanged(nameof(IsWebContentMode));
         OnPropertyChanged(nameof(CanOpenSelected));
+        RaiseBookmarkStateChanged();
         OpenSelectedArticleCommand.NotifyCanExecuteChanged();
         CopySelectedAsTextCommand.NotifyCanExecuteChanged();
         CopySelectedUrlCommand.NotifyCanExecuteChanged();
+        ToggleSelectedBookmarkCommand.NotifyCanExecuteChanged();
+
     }
 
     /// <summary>

@@ -52,9 +52,20 @@
             </muxc:NavigationView.Resources>
 
             <muxc:NavigationView.MenuItemTemplate>
-                <DataTemplate x:DataType="vm:NewsGroupViewModel">
-                    <TextBlock Text="{x:Bind Title}" />
+                <DataTemplate x:DataType="vm:NewsGroupViewModelBase">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <!-- Only the entries that are not one of the reader's own groups carry a
+                             glyph; a group is its title alone. -->
+                        <FontIcon
+                            VerticalAlignment="Center"
+                            FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                            FontSize="14"
+                            Glyph="{x:Bind Glyph}"
+                            Visibility="{x:Bind HasGlyph}" />
+                        <TextBlock Text="{x:Bind Title}" />
+                    </StackPanel>
                 </DataTemplate>
+
             </muxc:NavigationView.MenuItemTemplate>
 
             <muxc:NavigationView.PaneFooter>
@@ -123,6 +134,15 @@
                                 <ListView.ContextFlyout>
                                     <MenuFlyout Opening="NewsContextFlyoutOpening">
                                         <MenuFlyoutItem
+                                            Command="{x:Bind ViewModel.ToggleSelectedBookmarkCommand}"
+                                            Text="{x:Bind ViewModel.BookmarkToolTip, Mode=OneWay}">
+                                            <MenuFlyoutItem.Icon>
+                                                <FontIcon FontFamily="{ThemeResource SymbolThemeFontFamily}" Glyph="{x:Bind ViewModel.BookmarkGlyph, Mode=OneWay}" />
+                                            </MenuFlyoutItem.Icon>
+                                        </MenuFlyoutItem>
+                                        <MenuFlyoutSeparator />
+                                        <MenuFlyoutItem
+
                                             Command="{x:Bind ViewModel.CopySelectedAsTextCommand}"
                                             KeyboardAcceleratorTextOverride="Ctrl+C"
                                             Text="Copy as text">
@@ -322,17 +342,39 @@
                                     Text="{x:Bind ViewModel.SelectedByline, Mode=OneWay}" />
                             </StackPanel>
 
-                            <Button
+                            <StackPanel
                                 Grid.Column="1"
                                 VerticalAlignment="Top"
-                                Command="{x:Bind ViewModel.OpenSelectedArticleCommand}"
-                                Style="{StaticResource SubtleButtonStyle}"
-                                IsEnabled="{x:Bind ViewModel.CanOpenSelected, Mode=OneWay}">
-                                <FontIcon
-                                    FontFamily="{ThemeResource SymbolThemeFontFamily}"
-                                    FontSize="16"
-                                    Glyph="&#xE8A7;" />
-                            </Button>
+                                Orientation="Horizontal"
+                                Spacing="4">
+                                <!-- Keeps the story, or lets go of it. The star is filled while
+                                     it is kept, which is also how the bookmarks entry in the
+                                     group bar is marked. -->
+                                <Button
+                                    AutomationProperties.Name="{x:Bind ViewModel.BookmarkToolTip, Mode=OneWay}"
+                                    Command="{x:Bind ViewModel.ToggleSelectedBookmarkCommand}"
+                                    IsEnabled="{x:Bind ViewModel.HasSelection, Mode=OneWay}"
+                                    Style="{StaticResource SubtleButtonStyle}"
+                                    ToolTipService.ToolTip="{x:Bind ViewModel.BookmarkToolTip, Mode=OneWay}">
+                                    <FontIcon
+                                        FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                                        FontSize="16"
+                                        Glyph="{x:Bind ViewModel.BookmarkGlyph, Mode=OneWay}" />
+                                </Button>
+
+                                <Button
+                                    AutomationProperties.Name="Open in browser"
+                                    Command="{x:Bind ViewModel.OpenSelectedArticleCommand}"
+                                    IsEnabled="{x:Bind ViewModel.CanOpenSelected, Mode=OneWay}"
+                                    Style="{StaticResource SubtleButtonStyle}"
+                                    ToolTipService.ToolTip="Open in browser">
+                                    <FontIcon
+                                        FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                                        FontSize="16"
+                                        Glyph="&#xE8A7;" />
+                                </Button>
+                            </StackPanel>
+
                         </Grid>
 
                         <Grid Grid.Row="1">

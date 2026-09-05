@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace News.Domain;
 
 public sealed record NewsItem(
@@ -23,6 +25,11 @@ public sealed record NewsItem(
     /// identifier are told apart by their address, and the ones that publish neither by their
     /// title — which is all that is left to tell them apart by.
     /// </summary>
+    /// <remarks>
+    /// Worked out from what is stored rather than stored itself, so a file cannot end up
+    /// disagreeing with itself about which story it is describing.
+    /// </remarks>
+    [JsonIgnore]
     public string Key =>
         !string.IsNullOrWhiteSpace(Id) ? Id
         : !string.IsNullOrWhiteSpace(Url) ? Url

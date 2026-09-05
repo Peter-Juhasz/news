@@ -39,6 +39,17 @@ public sealed class NewsItemViewModel : ObservableObject
     /// </summary>
     public string Key { get; }
 
+    /// <summary>
+    /// The story this row shows, as its source returned it. Handed over whole when the row is
+    /// bookmarked, so what is kept is the story rather than the row's reading of it.
+    /// </summary>
+    public NewsItem Item => _item;
+
+    /// <summary>
+    /// The source it was read from, as that source is configured now.
+    /// </summary>
+    public NewsSource Source => _source;
+
     public string? Id => _item.Id;
 
     public DateTimeOffset Date => _item.Date;

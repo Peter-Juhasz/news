@@ -82,21 +82,25 @@ internal sealed partial class HtmlFlowBuilder
     private readonly List<Action<double>> _widthAppliers = [];
     private readonly Stack<ListState> _lists = new();
     private readonly double _baseFontSize;
+    private readonly Action<Uri> _linkActivated;
 
     private Paragraph? _paragraph;
     private Hyperlink? _hyperlink;
+    private Uri? _hyperlinkTarget;
     private Run? _lastRun;
     private bool _trimLeadingSpace = true;
     private double _indent;
 
-    private HtmlFlowBuilder(double baseFontSize)
+    private HtmlFlowBuilder(double baseFontSize, Action<Uri> linkActivated)
     {
         _baseFontSize = baseFontSize;
+        _linkActivated = linkActivated;
     }
 
-    public static HtmlFlowResult Build(string html, double baseFontSize)
+    /// <param name="linkActivated">Called when a link is clicked; the builder never navigates itself.</param>
+    public static HtmlFlowResult Build(string html, double baseFontSize, Action<Uri> linkActivated)
     {
-        var builder = new HtmlFlowBuilder(baseFontSize);
+        var builder = new HtmlFlowBuilder(baseFontSize, linkActivated);
         var document = Parser.ParseDocument(html);
         INode? root = document.Body ?? document.DocumentElement;
 
@@ -427,6 +431,7 @@ internal sealed partial class HtmlFlowBuilder
         // A line break always sits directly in the paragraph; a Hyperlink cannot host it.
         EnsureParagraph().Inlines.Add(new LineBreak());
         _hyperlink = null;
+        _hyperlinkTarget = null;
         _lastRun = null;
         _trimLeadingSpace = true;
     }
@@ -487,6 +492,7 @@ internal sealed partial class HtmlFlowBuilder
         EnsureParagraph().Inlines.Add(new InlineUIContainer { Child = image });
         _widthAppliers.Add(width => image.MaxWidth = width);
         _hyperlink = null;
+        _hyperlinkTarget = null;
         _lastRun = null;
         _trimLeadingSpace = false;
     }
@@ -496,8 +502,12 @@ internal sealed partial class HtmlFlowBuilder
         int.TryParse(element.GetAttribute("height"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var height) &&
         width <= 1 && height <= 1;
 
+    /// <summary>
+    /// Only https addresses become links: feed content is untrusted, so file, javascript, data and
+    /// every other scheme is left as plain text rather than handed to the shell.
+    /// </summary>
     private static Uri? ResolveLink(string? href) =>
-        Uri.TryCreate(href, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https" or "mailto"
+        Uri.TryCreate(href, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps
             ? uri
             : null;
 
@@ -508,12 +518,19 @@ internal sealed partial class HtmlFlowBuilder
         if (format.Link is null)
         {
             _hyperlink = null;
+            _hyperlinkTarget = null;
             return paragraph.Inlines;
         }
 
-        if (_hyperlink is null || _hyperlink.NavigateUri != format.Link)
+        if (_hyperlink is null || _hyperlinkTarget != format.Link)
         {
-            _hyperlink = new Hyperlink { NavigateUri = format.Link };
+            var target = format.Link;
+
+            // NavigateUri is left unset on purpose: it would open the browser before the
+            // confirmation is shown, and a Click handler cannot cancel that navigation.
+            _hyperlink = new Hyperlink();
+            _hyperlink.Click += (_, _) => _linkActivated(target);
+            _hyperlinkTarget = target;
             paragraph.Inlines.Add(_hyperlink);
         }
 
@@ -554,6 +571,7 @@ internal sealed partial class HtmlFlowBuilder
 
         _paragraph = null;
         _hyperlink = null;
+        _hyperlinkTarget = null;
         _lastRun = null;
         _trimLeadingSpace = true;
     }

@@ -1,5 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Windows.System;
 
 namespace News.Client.WinUI3.Controls;
 
@@ -23,6 +24,7 @@ public sealed class HtmlTextBlock : UserControl
     };
 
     private IReadOnlyList<Action<double>> _widthAppliers = [];
+    private bool _isConfirmingLink;
 
     public HtmlTextBlock()
     {
@@ -58,7 +60,7 @@ public sealed class HtmlTextBlock : UserControl
             return;
         }
 
-        var result = HtmlFlowBuilder.Build(html, FontSize);
+        var result = HtmlFlowBuilder.Build(html, FontSize, OnLinkActivated);
 
         foreach (var block in result.Blocks)
         {
@@ -67,6 +69,47 @@ public sealed class HtmlTextBlock : UserControl
 
         _widthAppliers = result.WidthAppliers;
         ApplyWidth(ActualWidth);
+    }
+
+    /// <summary>
+    /// Feed content decides where its links point, so the address is shown for approval before the
+    /// browser is opened.
+    /// </summary>
+    private async void OnLinkActivated(Uri uri)
+    {
+        if (_isConfirmingLink || XamlRoot is null)
+        {
+            return;
+        }
+
+        _isConfirmingLink = true;
+
+        try
+        {
+            var dialog = new ContentDialog
+            {
+                XamlRoot = XamlRoot,
+                Title = "Open this link?",
+                Content = new TextBlock
+                {
+                    Text = uri.ToString(),
+                    TextWrapping = TextWrapping.Wrap,
+                    IsTextSelectionEnabled = true
+                },
+                PrimaryButtonText = "Open",
+                CloseButtonText = "Cancel",
+                DefaultButton = ContentDialogButton.Close
+            };
+
+            if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+            {
+                await Launcher.LaunchUriAsync(uri);
+            }
+        }
+        finally
+        {
+            _isConfirmingLink = false;
+        }
     }
 
     private void OnSizeChanged(object sender, SizeChangedEventArgs e) => ApplyWidth(e.NewSize.Width);

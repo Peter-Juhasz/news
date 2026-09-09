@@ -4,6 +4,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:News.Client.WinUI3.Controls"
     xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
+    xmlns:toolkit="using:CommunityToolkit.WinUI.Controls"
     xmlns:vm="using:News.Client.WinUI3.ViewModels"
     Title="News">
 
@@ -441,6 +442,22 @@
                                 Visibility="{x:Bind ViewModel.IsContentLoading, Mode=OneWay}" />
                         </Grid>
                     </Grid>
+
+                    <!-- Drag to trade width between the list and the reading pane. PreviousAndCurrent
+                         resizes this splitter's own column and the one before it, so it shares the
+                         reading pane's cell rather than taking a column of its own, and the negative
+                         margin centres its grab strip on the seam between the two panes. Both columns
+                         are star-sized, so the drag rewrites the ratio instead of pinning either pane
+                         to pixels, and the split survives a window resize. Declared last so it sits
+                         above the reading pane and stays grabbable. -->
+                    <toolkit:GridSplitter
+                        Grid.Column="1"
+                        Width="8"
+                        Margin="-4,0,0,0"
+                        HorizontalAlignment="Left"
+                        Background="Transparent"
+                        ResizeBehavior="PreviousAndCurrent"
+                        ResizeDirection="Columns" />
                 </Grid>
             </muxc:NavigationView.Content>
         </muxc:NavigationView>

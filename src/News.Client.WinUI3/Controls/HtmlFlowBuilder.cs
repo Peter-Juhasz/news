@@ -6,6 +6,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Documents;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
+using System.Collections.Frozen;
 using System.Globalization;
 using System.Text.RegularExpressions;
 using Windows.UI.Text;
@@ -28,26 +29,26 @@ internal sealed partial class HtmlFlowBuilder
     private static readonly FontFamily MonospaceFontFamily = new("Consolas");
 
     /// <summary>Non-content elements dropped together with their children.</summary>
-    private static readonly HashSet<string> IgnoredElements = new(StringComparer.Ordinal)
+    private static readonly FrozenSet<string> IgnoredElements = new string[]
     {
         "script", "style", "head", "title", "meta", "link", "base", "template", "noscript",
         "source", "track", "param", "wbr"
-    };
+    }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Elements that only break the flow into paragraphs around their children.</summary>
-    private static readonly HashSet<string> BlockContainerElements = new(StringComparer.Ordinal)
+    private static readonly FrozenSet<string> BlockContainerElements = new string[]
     {
         "html", "body", "div", "section", "article", "header", "footer", "main", "aside", "nav",
         "figure", "figcaption", "address", "center", "details", "summary", "dl", "form", "fieldset",
         "table", "thead", "tbody", "tfoot", "tr", "caption"
-    };
+    }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Elements that pass their children through unchanged.</summary>
-    private static readonly HashSet<string> InlineContainerElements = new(StringComparer.Ordinal)
+    private static readonly FrozenSet<string> InlineContainerElements = new string[]
     {
         "span", "font", "abbr", "acronym", "q", "time", "label", "mark", "bdi", "bdo", "data",
         "picture", "nobr", "ruby", "rt", "rp"
-    };
+    }.ToFrozenSet(StringComparer.OrdinalIgnoreCase);
 
     private readonly record struct TextFormat(
         bool Bold,
@@ -71,6 +72,9 @@ internal sealed partial class HtmlFlowBuilder
             Link: null);
     }
 
+    /// <summary>A size the content asks for, in pixels or as a percentage of what is available.</summary>
+    private readonly record struct HtmlLength(double Value, bool IsPercentage);
+
     private sealed class ListState(bool ordered, int start)
     {
         public bool Ordered { get; } = ordered;
@@ -83,7 +87,9 @@ internal sealed partial class HtmlFlowBuilder
     private readonly Stack<ListState> _lists = new();
     private readonly double _baseFontSize;
     private readonly Action<Uri> _linkActivated;
+    private readonly bool _areImagesEnabled;
 
+    private bool _hasBlockedImages;
     private Paragraph? _paragraph;
     private Hyperlink? _hyperlink;
     private Uri? _hyperlinkTarget;
@@ -91,16 +97,26 @@ internal sealed partial class HtmlFlowBuilder
     private bool _trimLeadingSpace = true;
     private double _indent;
 
-    private HtmlFlowBuilder(double baseFontSize, Action<Uri> linkActivated)
+    private HtmlFlowBuilder(double baseFontSize, Action<Uri> linkActivated, bool areImagesEnabled)
     {
         _baseFontSize = baseFontSize;
         _linkActivated = linkActivated;
+        _areImagesEnabled = areImagesEnabled;
     }
 
     /// <param name="linkActivated">Called when a link is clicked; the builder never navigates itself.</param>
-    public static HtmlFlowResult Build(string html, double baseFontSize, Action<Uri> linkActivated)
+    /// <param name="areImagesEnabled">
+    /// Whether pictures are fetched and drawn. Fetching one is a request to wherever the content
+    /// says, which is how a sender learns that the message was opened, so it is asked for rather
+    /// than assumed — see <see cref="HtmlFlowResult.HasBlockedImages"/> for what was held back.
+    /// </param>
+    public static HtmlFlowResult Build(
+        string html,
+        double baseFontSize,
+        Action<Uri> linkActivated,
+        bool areImagesEnabled)
     {
-        var builder = new HtmlFlowBuilder(baseFontSize, linkActivated);
+        var builder = new HtmlFlowBuilder(baseFontSize, linkActivated, areImagesEnabled);
         var document = Parser.ParseDocument(html);
         INode? root = document.Body ?? document.DocumentElement;
 
@@ -110,7 +126,7 @@ internal sealed partial class HtmlFlowBuilder
         }
 
         builder.EndParagraph();
-        return new HtmlFlowResult(builder._blocks, builder._widthAppliers);
+        return new HtmlFlowResult(builder._blocks, builder._widthAppliers, builder._hasBlockedImages);
     }
 
     [GeneratedRegex("[ \t\r\n\f]+")]
@@ -465,19 +481,26 @@ internal sealed partial class HtmlFlowBuilder
             source = element.GetAttribute("data-src");
         }
 
+        // A picture this cannot fetch — one carried inside the message, or addressed in some scheme
+        // of its own — is not one that showing pictures would bring back, so it is what it says it
+        // is and nothing is held back.
         if (!Uri.TryCreate(source, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https"))
         {
-            var alt = element.GetAttribute("alt");
-            if (!string.IsNullOrWhiteSpace(alt))
-            {
-                AppendText(alt, format);
-            }
-
+            AppendAlternativeText(element, format);
             return;
         }
 
         if (IsTrackingPixel(element))
         {
+            return;
+        }
+
+        if (!_areImagesEnabled)
+        {
+            // Counted rather than drawn, so that what was held back can be offered to the reader
+            // instead of quietly left out.
+            _hasBlockedImages = true;
+            AppendAlternativeText(element, format);
             return;
         }
 
@@ -488,19 +511,138 @@ internal sealed partial class HtmlFlowBuilder
             HorizontalAlignment = Microsoft.UI.Xaml.HorizontalAlignment.Left
         };
 
+        var requestedWidth = ReadLength(element, "width");
+        var requestedHeight = ReadLength(element, "height");
+
         // Images sit directly in the paragraph: an InlineUIContainer is not allowed inside a Hyperlink.
         EnsureParagraph().Inlines.Add(new InlineUIContainer { Child = image });
-        _widthAppliers.Add(width => image.MaxWidth = width);
+        _widthAppliers.Add(width => ApplyImageSize(image, requestedWidth, requestedHeight, width));
         _hyperlink = null;
         _hyperlinkTarget = null;
         _lastRun = null;
         _trimLeadingSpace = false;
     }
 
+    /// <summary>
+    /// What a picture that is not drawn leaves in its place: what the sender wrote it as, where they
+    /// wrote one. A picture nobody described leaves nothing rather than a gap of its own.
+    /// </summary>
+    private void AppendAlternativeText(IElement element, TextFormat format)
+    {
+        if (element.GetAttribute("alt") is { } alt && !string.IsNullOrWhiteSpace(alt))
+        {
+            AppendText(alt, format);
+        }
+    }
+
     private static bool IsTrackingPixel(IElement element) =>
-        int.TryParse(element.GetAttribute("width"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var width) &&
-        int.TryParse(element.GetAttribute("height"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var height) &&
-        width <= 1 && height <= 1;
+        ReadLength(element, "width") is { IsPercentage: false, Value: <= 1 } &&
+        ReadLength(element, "height") is { IsPercentage: false, Value: <= 1 };
+
+    /// <summary>
+    /// Sizes a picture the way the content asks, within the room the control actually has: a
+    /// percentage is of that room, and a picture asking for more than there is is scaled down whole
+    /// rather than squashed or cropped.
+    /// </summary>
+    private static void ApplyImageSize(Image image, HtmlLength? width, HtmlLength? height, double available)
+    {
+        image.MaxWidth = available;
+
+        double? finalWidth = width is { } w
+            ? w.IsPercentage ? available * w.Value / 100 : w.Value
+            : null;
+
+        // A percentage height is of the height of what contains the picture, which a flow of text
+        // does not have one of, so only pixel heights are honoured.
+        double? finalHeight = height is { IsPercentage: false } h ? h.Value : null;
+
+        if (finalWidth > available)
+        {
+            // Keep the proportions the content asked for while fitting what there is room for.
+            finalHeight = finalHeight * available / finalWidth;
+            finalWidth = available;
+        }
+
+        if (finalWidth is { } widthValue)
+        {
+            image.Width = widthValue;
+        }
+
+        if (finalHeight is { } heightValue)
+        {
+            image.Height = heightValue;
+        }
+    }
+
+    /// <summary>
+    /// The size the content asks an element for: the inline style if it says one, else the attribute
+    /// of the same name, a style declaration winning over the attribute it duplicates.
+    /// </summary>
+    private static HtmlLength? ReadLength(IElement element, string property) =>
+        ParseLength(ReadStyleProperty(element.GetAttribute("style"), property)) ??
+        ParseLength(element.GetAttribute(property));
+
+    /// <summary>
+    /// Reads one declaration out of an inline style. Deliberately crude — the style is split into
+    /// declarations and each into a name and a value, and anything that does not come apart that way
+    /// is passed over: what a real stylesheet parser would buy here is not worth what it costs.
+    /// </summary>
+    private static string? ReadStyleProperty(string? style, string property)
+    {
+        if (string.IsNullOrEmpty(style))
+        {
+            return null;
+        }
+
+        string? value = null;
+
+        foreach (var declaration in style.Split(';'))
+        {
+            var separator = declaration.IndexOf(':', StringComparison.Ordinal);
+            if (separator < 0 ||
+                !declaration.AsSpan(0, separator).Trim().Equals(property, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            // Kept looking rather than returned: the last declaration of a property is the one that
+            // counts, as it does in CSS.
+            value = declaration[(separator + 1)..].Trim();
+        }
+
+        return value;
+    }
+
+    /// <summary>
+    /// A number followed by an optional unit. Only pixels and percentages are read: everything else
+    /// — em, cm, calc(), auto, inherit — has no length this can work out on its own, so it is left
+    /// for the layout to decide as if nothing had been asked for.
+    /// </summary>
+    private static HtmlLength? ParseLength(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return null;
+        }
+
+        var value = text.AsSpan().Trim();
+        var isPercentage = value.EndsWith("%", StringComparison.Ordinal);
+
+        if (isPercentage)
+        {
+            value = value[..^1];
+        }
+        else if (value.EndsWith("px", StringComparison.OrdinalIgnoreCase))
+        {
+            value = value[..^2];
+        }
+
+        return double.TryParse(value.TrimEnd(), NumberStyles.Float, CultureInfo.InvariantCulture, out var number) &&
+            double.IsFinite(number) &&
+            number >= 0
+                ? new HtmlLength(number, isPercentage)
+                : null;
+    }
 
     /// <summary>
     /// Only https addresses become links: feed content is untrusted, so file, javascript, data and
@@ -581,4 +723,12 @@ internal sealed partial class HtmlFlowBuilder
 /// Blocks produced from an HTML fragment, plus callbacks that size width-dependent elements
 /// (images, separators) once the hosting control knows its width.
 /// </summary>
-internal sealed record HtmlFlowResult(IReadOnlyList<Block> Blocks, IReadOnlyList<Action<double>> WidthAppliers);
+/// <param name="HasBlockedImages">
+/// Whether the content carries a picture that was not drawn because pictures are turned off — the
+/// ones that showing them would actually bring back, so this is what there is to offer the reader.
+/// Trackers are left out of it: a pixel nobody can see is not a picture being held back.
+/// </param>
+internal sealed record HtmlFlowResult(
+    IReadOnlyList<Block> Blocks,
+    IReadOnlyList<Action<double>> WidthAppliers,
+    bool HasBlockedImages);

@@ -60,7 +60,7 @@ public sealed class HtmlTextBlock : UserControl
             return;
         }
 
-        var result = HtmlFlowBuilder.Build(html, FontSize, OnLinkActivated);
+        var result = HtmlFlowBuilder.Build(html, FontSize, OnLinkActivated, areImagesEnabled: true);
 
         foreach (var block in result.Blocks)
         {

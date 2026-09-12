@@ -1,8 +1,11 @@
+using Microsoft.Extensions.Options;
 using Microsoft.UI.Composition.SystemBackdrops;
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using News.Client.WinUI3.Configuration;
 using News.Client.WinUI3.ViewModels;
 using Windows.System;
 
@@ -28,11 +31,11 @@ public sealed partial class MainWindow : Window
     private NewsItemViewModel? _contextTargetItem;
     private ScrollViewer? _newsScrollViewer;
 
-    public MainWindow(MainViewModel viewModel)
+    public MainWindow(MainViewModel viewModel, IOptions<AppearanceOptions> appearanceOptions)
     {
         ViewModel = viewModel;
         InitializeComponent();
-        ConfigureWindowChrome();
+        ConfigureWindowChrome(appearanceOptions.Value.Theme);
         GroupedNewsSource.Source = ViewModel.DayGroups;
         ViewModel.PropertyChanged += ViewModelOnPropertyChanged;
     }
@@ -368,17 +371,29 @@ public sealed partial class MainWindow : Window
         BrowserWebView.Source = targetUri;
     }
 
-    private void ConfigureWindowChrome()
+    /// <param name="theme">
+    /// What the app is drawn in, which the caption buttons are told separately: they are the
+    /// system's, drawn outside the tree the application's theme reaches, and left to themselves
+    /// they follow Windows rather than the app.
+    /// </param>
+    private void ConfigureWindowChrome(ElementTheme theme)
     {
         Title = "News";
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
 
+        AppWindow.TitleBar.PreferredTheme = theme switch
+        {
+            ElementTheme.Light => TitleBarTheme.Light,
+            ElementTheme.Dark => TitleBarTheme.Dark,
+            _ => TitleBarTheme.UseDefaultAppMode,
+        };
+
         if (MicaController.IsSupported())
         {
             SystemBackdrop = new MicaBackdrop
             {
-                Kind = MicaKind.BaseAlt
+                Kind = MicaKind.Base
             };
         }
 

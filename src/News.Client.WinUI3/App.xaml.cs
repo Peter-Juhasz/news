@@ -1,9 +1,11 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
 using News.Bookmarks;
+using News.Client.WinUI3.Configuration;
 using News.Client.WinUI3.ViewModels;
 using News.Configuration;
 
@@ -21,10 +23,34 @@ public partial class App : Application
     {
         InitializeComponent();
         _host = BuildHost();
+        ApplyTheme();
 
 		// HACK: fix for sluggish UI on Windows 11, see https://github.com/microsoft/microsoft-ui-xaml/issues/11144
 		CompositionTarget.Rendering += (_, _) => { };
 	}
+
+    /// <summary>
+    /// Puts the configured theme on the application rather than on the window's content.
+    /// </summary>
+    /// <remarks>
+    /// A theme set on an element reaches that element's tree and nothing else, which leaves out
+    /// everything drawn beside it: the window's caption buttons, and dialogs and flyouts, which hang
+    /// off the root of the tree rather than off the element that opened them. Set here it is what
+    /// the whole app is drawn in, whatever part of it is being drawn. It is set before any window
+    /// exists, which is the only time it can be: the application's theme is fixed once there is
+    /// content drawn in it.
+    /// </remarks>
+    private void ApplyTheme()
+    {
+        var theme = _host.Services.GetRequiredService<IOptions<AppearanceOptions>>().Value.Theme;
+
+        // ApplicationTheme has no "Default", and needs none: following the system is what the
+        // application does when nothing is said, so saying nothing is how that is asked for.
+        if (theme is ElementTheme.Light or ElementTheme.Dark)
+        {
+            RequestedTheme = theme is ElementTheme.Light ? ApplicationTheme.Light : ApplicationTheme.Dark;
+        }
+    }
 
     protected override async void OnLaunched(LaunchActivatedEventArgs args)
     {
@@ -51,6 +77,11 @@ public partial class App : Application
         builder.Configuration.AddEnvironmentVariables();
 
         builder.Services.Configure<NewsReaderOptions>(builder.Configuration.GetSection(NewsReaderOptions.SectionName));
+
+        // The app's own look, kept apart from the reader's settings: it binds
+        // Microsoft.UI.Xaml.ElementTheme, a WinUI type News.Services cannot take a dependency on.
+        builder.Services.Configure<AppearanceOptions>(builder.Configuration.GetSection(AppearanceOptions.SectionName));
+
         builder.Services.AddSingleton<MainViewModel>();
         builder.Services.AddSingleton<MainWindow>();
         builder.Services.AddSingleton<GroupsFileLoader>();

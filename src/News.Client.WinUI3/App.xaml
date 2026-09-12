@@ -4,6 +4,30 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:Microsoft.UI.Xaml.Controls">
     <Application.Resources>
-        <controls:XamlControlsResources />
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <controls:XamlControlsResources />
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- The sheet a story is read off. Plain white under black on a light theme, as a
+                 printed page is: the pane's own layer brush is a surface for the app's chrome,
+                 and an article is a document sitting on it rather than more of the same chrome. -->
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="DocumentBackgroundBrush" Color="#FFFFFFFF" />
+                    <SolidColorBrush x:Key="DocumentForegroundBrush" Color="#FF000000" />
+                </ResourceDictionary>
+
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="DocumentBackgroundBrush" Color="#FF1B1B1B" />
+                    <SolidColorBrush x:Key="DocumentForegroundBrush" Color="#FFFFFFFF" />
+                </ResourceDictionary>
+
+                <ResourceDictionary x:Key="HighContrast">
+                    <SolidColorBrush x:Key="DocumentBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush x:Key="DocumentForegroundBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
     </Application.Resources>
 </Application>

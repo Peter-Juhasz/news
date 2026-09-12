@@ -311,21 +311,28 @@
 
                     <!-- The NavigationView's own content layer is transparent so Mica shows through
                          the list; the reading pane restores it with the same built-in brushes,
-                         thickness and corner radius the NavigationView content grid uses. -->
+                         thickness and corner radius the NavigationView content grid uses.
+
+                         What the pane sets in is set in by the rows that want it rather than by
+                         the pane itself: the sheet the story is read off runs the width of the
+                         pane, and a padding on the pane would hold it off both edges. -->
                     <Grid
                         Grid.Column="1"
-                        Padding="24,24,24,0"
+                        Padding="0,20,0,0"
                         Background="{ThemeResource LayerFillColorDefaultBrush}"
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                         BorderThickness="1,1,0,0"
                         CornerRadius="8,0,0,0"
-                        RowSpacing="12">
+                        RowSpacing="16">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
 
-                        <Grid Grid.Row="0" ColumnSpacing="12">
+                        <Grid
+                            Grid.Row="0"
+                            Margin="24,0"
+                            ColumnSpacing="12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
@@ -395,41 +402,62 @@
                                     Text="Select a story from the list." />
                             </StackPanel>
 
-                            <muxc:WebView2 x:Name="ArticleWebView" Visibility="{x:Bind ViewModel.IsHtmlContentMode, Mode=OneWay}" />
-
-                            <muxc:WebView2 x:Name="BrowserWebView" Visibility="{x:Bind ViewModel.IsWebContentMode, Mode=OneWay}" />
-
-                            <!-- Declared last so it sits above the WebView2 layers and receives the
-                                 pointer wheel while the text view is showing.
-
-                                 ScrollView rather than ScrollViewer: the older control drives wheel
-                                 scrolling through DirectManipulation, which in a long-running window
-                                 can lose sync with what is drawn — the thumb travels while the text
-                                 stays put, and only dragging the thumb still moves it. ScrollView
-                                 scrolls through InteractionTracker instead and has no such split.
-                                 ContentOrientation="Vertical" (the default) is what the old
-                                 Horizontal*="Disabled" pair said: constrain the width, grow down. -->
-                            <muxc:ScrollView
-                                x:Name="TextContentScrollView"
-                                ContentOrientation="Vertical"
-                                HorizontalScrollBarVisibility="Hidden"
-                                VerticalScrollBarVisibility="Auto"
-                                Visibility="{x:Bind ViewModel.IsTextContentMode, Mode=OneWay}">
+                            <!-- The sheet the story is read off: a surface of its own filling what the
+                                 pane gives the body, so that an article reads as a document rather
+                                 than as more text on the app's chrome. It is the sheet that holds
+                                 still and the text that moves within it — a card sized to the text
+                                 would scroll away with it. Flush with the bottom of the window, as
+                                 the pane around it is: the page carries on past the edge rather
+                                 than stopping short of it. -->
+                            <Border
+                                Background="{ThemeResource DocumentBackgroundBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="0,1,0,0"
+                                Visibility="{x:Bind ViewModel.HasSelection, Mode=OneWay}">
                                 <Grid>
-                                    <TextBlock
-                                        IsTextSelectionEnabled="True"
-                                        Style="{StaticResource BodyTextBlockStyle}"
-                                        Text="{x:Bind ViewModel.SelectedPlainContent, Mode=OneWay}"
-                                        TextWrapping="Wrap"
-                                        Visibility="{x:Bind ViewModel.IsPlainTextContentMode, Mode=OneWay}" />
+                                    <muxc:WebView2 x:Name="ArticleWebView" Visibility="{x:Bind ViewModel.IsHtmlContentMode, Mode=OneWay}" />
 
-                                    <!-- Feed bodies are usually simple HTML; this renders their structure
-                                         as native flow text instead of a web view. -->
-                                    <controls:HtmlTextBlock
-                                        Html="{x:Bind ViewModel.SelectedHtmlContent, Mode=OneWay}"
-                                        Visibility="{x:Bind ViewModel.IsFormattedTextContentMode, Mode=OneWay}" />
+                                    <muxc:WebView2 x:Name="BrowserWebView" Visibility="{x:Bind ViewModel.IsWebContentMode, Mode=OneWay}" />
+
+                                    <!-- Declared last so it sits above the WebView2 layers and receives the
+                                         pointer wheel while the text view is showing.
+
+                                         ScrollView rather than ScrollViewer: the older control drives wheel
+                                         scrolling through DirectManipulation, which in a long-running window
+                                         can lose sync with what is drawn — the thumb travels while the text
+                                         stays put, and only dragging the thumb still moves it. ScrollView
+                                         scrolls through InteractionTracker instead and has no such split.
+                                         ContentOrientation="Vertical" (the default) is what the old
+                                         Horizontal*="Disabled" pair said: constrain the width, grow down. -->
+                                    <muxc:ScrollView
+                                        x:Name="TextContentScrollView"
+                                        ContentOrientation="Vertical"
+                                        HorizontalScrollBarVisibility="Hidden"
+                                        VerticalScrollBarVisibility="Auto"
+                                        Visibility="{x:Bind ViewModel.IsTextContentMode, Mode=OneWay}">
+                                        <!-- The margins are the content's, not the sheet's, so the scroll bar
+                                             rides the edge of the page rather than the text. -->
+                                        <Grid>
+                                            <TextBlock
+                                                Margin="20,16,20,24"
+                                                Foreground="{ThemeResource DocumentForegroundBrush}"
+                                                IsTextSelectionEnabled="True"
+                                                Style="{StaticResource BodyTextBlockStyle}"
+                                                Text="{x:Bind ViewModel.SelectedPlainContent, Mode=OneWay}"
+                                                TextWrapping="Wrap"
+                                                Visibility="{x:Bind ViewModel.IsPlainTextContentMode, Mode=OneWay}" />
+
+                                            <!-- Feed bodies are usually simple HTML; this renders their structure
+                                                 as native flow text instead of a web view. -->
+                                            <controls:HtmlTextBlock
+                                                Margin="20,16,20,24"
+                                                Foreground="{ThemeResource DocumentForegroundBrush}"
+                                                Html="{x:Bind ViewModel.SelectedHtmlContent, Mode=OneWay}"
+                                                Visibility="{x:Bind ViewModel.IsFormattedTextContentMode, Mode=OneWay}" />
+                                        </Grid>
+                                    </muxc:ScrollView>
                                 </Grid>
-                            </muxc:ScrollView>
+                            </Border>
 
                             <!-- Sources that pull their body from the article's own page keep the
                                  pane on this until the page is in. -->

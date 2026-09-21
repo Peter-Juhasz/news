@@ -1,11 +1,10 @@
-using AngleSharp.Dom;
-using AngleSharp.Html.Parser;
 using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Documents;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
+using PeterJuhasz.Text.Html.Model;
 using System.Collections.Frozen;
 using System.Globalization;
 using System.Text.RegularExpressions;
@@ -18,14 +17,13 @@ namespace News.Client.WinUI3.Controls;
 /// block elements become paragraphs, inline formatting becomes run properties, images become
 /// inline UI containers. Elements without a translation are emitted as their outer HTML text.
 /// </summary>
-internal sealed partial class HtmlFlowBuilder
+internal sealed partial class HtmlFlowBuilder : HtmlVisitor
 {
     private const double ParagraphSpacing = 8;
     private const double HeadingSpacing = 12;
     private const double ListIndent = 20;
     private const double QuoteIndent = 16;
 
-    private static readonly HtmlParser Parser = new();
     private static readonly FontFamily MonospaceFontFamily = new("Consolas");
 
     /// <summary>Non-content elements dropped together with their children.</summary>
@@ -96,6 +94,7 @@ internal sealed partial class HtmlFlowBuilder
     private Run? _lastRun;
     private bool _trimLeadingSpace = true;
     private double _indent;
+    private TextFormat _format = TextFormat.Default;
 
     private HtmlFlowBuilder(double baseFontSize, Action<Uri> linkActivated, bool areImagesEnabled)
     {
@@ -117,12 +116,17 @@ internal sealed partial class HtmlFlowBuilder
         bool areImagesEnabled)
     {
         var builder = new HtmlFlowBuilder(baseFontSize, linkActivated, areImagesEnabled);
-        var document = Parser.ParseDocument(html);
-        INode? root = document.Body ?? document.DocumentElement;
+        var document = HtmlDocument.Parse(html);
 
-        if (root is not null)
+        // Without a body the content is a fragment, and all of it is content; the head and its
+        // children are dropped as ignored elements either way.
+        if (document.TryQuerySelector(out var body, name: "body"))
         {
-            builder.VisitChildren(root, TextFormat.Default);
+            builder.VisitChildren(body, TextFormat.Default);
+        }
+        else
+        {
+            builder.VisitDocument(document);
         }
 
         builder.EndParagraph();
@@ -132,33 +136,29 @@ internal sealed partial class HtmlFlowBuilder
     [GeneratedRegex("[ \t\r\n\f]+")]
     private static partial Regex HtmlWhitespaceRegex();
 
-    private void VisitChildren(INode node, TextFormat format)
+    /// <summary>Visits the children of an element in the given format, restoring the current one afterwards.</summary>
+    private void VisitChildren(HtmlElement element, TextFormat format)
     {
-        foreach (var child in node.ChildNodes)
+        var outer = _format;
+        _format = format;
+
+        foreach (var child in element.Nodes)
         {
-            Visit(child, format);
+            VisitNode(child);
         }
+
+        _format = outer;
     }
 
-    private void Visit(INode node, TextFormat format)
+    // Comments carry no visible content and are left to the base visitor, which ignores them.
+    public override void VisitText(HtmlText text) => AppendText(text.Text, _format);
+
+    public override void VisitElement(HtmlElement element)
     {
-        switch (node)
-        {
-            case IText text:
-                AppendText(text.Data, format);
-                break;
+        var format = _format;
 
-            case IElement element:
-                VisitElement(element, format);
-                break;
-
-            // Comments, doctype and processing instructions carry no visible content.
-        }
-    }
-
-    private void VisitElement(IElement element, TextFormat format)
-    {
-        switch (element.LocalName)
+        // The parser keeps names as written, so they are matched in their canonical lowercase form.
+        switch (element.Name.ToLowerInvariant())
         {
             case "p":
                 VisitBlock(element, format, topSpacing: 0);
@@ -225,7 +225,7 @@ internal sealed partial class HtmlFlowBuilder
                 break;
 
             case "a":
-                VisitChildren(element, format with { Link = ResolveLink(element.GetAttribute("href")) ?? format.Link });
+                VisitChildren(element, format with { Link = ResolveLink(element.GetAttribute("href")?.Value) ?? format.Link });
                 break;
 
             case "b":
@@ -278,9 +278,9 @@ internal sealed partial class HtmlFlowBuilder
         }
     }
 
-    private void VisitOtherElement(IElement element, TextFormat format)
+    private void VisitOtherElement(HtmlElement element, TextFormat format)
     {
-        var name = element.LocalName;
+        var name = element.Name;
 
         if (IgnoredElements.Contains(name))
         {
@@ -302,10 +302,10 @@ internal sealed partial class HtmlFlowBuilder
         }
 
         // No translation for this element: show its markup verbatim so nothing is lost.
-        AppendText(element.OuterHtml, format);
+        AppendText(element.ToString(), format);
     }
 
-    private void VisitBlock(IElement element, TextFormat format, double topSpacing, double extraIndent = 0)
+    private void VisitBlock(HtmlElement element, TextFormat format, double topSpacing, double extraIndent = 0)
     {
         EndParagraph();
         _indent += extraIndent;
@@ -315,15 +315,15 @@ internal sealed partial class HtmlFlowBuilder
         _indent -= extraIndent;
     }
 
-    private void VisitList(IElement element, TextFormat format)
+    private void VisitList(HtmlElement element, TextFormat format)
     {
         EndParagraph();
 
-        var start = int.TryParse(element.GetAttribute("start"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedStart)
+        var start = int.TryParse(element.GetAttribute("start")?.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedStart)
             ? parsedStart
             : 1;
 
-        _lists.Push(new ListState(element.LocalName == "ol", start));
+        _lists.Push(new ListState(element.Name.Equals("ol", StringComparison.OrdinalIgnoreCase), start));
         _indent += ListIndent;
         VisitChildren(element, format);
         _indent -= ListIndent;
@@ -332,7 +332,7 @@ internal sealed partial class HtmlFlowBuilder
         EndParagraph();
     }
 
-    private void VisitListItem(IElement element, TextFormat format)
+    private void VisitListItem(HtmlElement element, TextFormat format)
     {
         EndParagraph();
         StartParagraph(topSpacing: 0);
@@ -346,7 +346,7 @@ internal sealed partial class HtmlFlowBuilder
         EndParagraph();
     }
 
-    private void VisitTableCell(IElement element, TextFormat format)
+    private void VisitTableCell(HtmlElement element, TextFormat format)
     {
         // Cells of a row share one paragraph, separated by tabs; the row itself breaks the flow.
         VisitChildren(element, format);
@@ -473,12 +473,12 @@ internal sealed partial class HtmlFlowBuilder
         EndParagraph();
     }
 
-    private void AppendImage(IElement element, TextFormat format)
+    private void AppendImage(HtmlElement element, TextFormat format)
     {
-        var source = element.GetAttribute("src");
+        var source = element.GetAttribute("src")?.Value;
         if (string.IsNullOrWhiteSpace(source))
         {
-            source = element.GetAttribute("data-src");
+            source = element.GetAttribute("data-src")?.Value;
         }
 
         // A picture this cannot fetch — one carried inside the message, or addressed in some scheme
@@ -527,15 +527,15 @@ internal sealed partial class HtmlFlowBuilder
     /// What a picture that is not drawn leaves in its place: what the sender wrote it as, where they
     /// wrote one. A picture nobody described leaves nothing rather than a gap of its own.
     /// </summary>
-    private void AppendAlternativeText(IElement element, TextFormat format)
+    private void AppendAlternativeText(HtmlElement element, TextFormat format)
     {
-        if (element.GetAttribute("alt") is { } alt && !string.IsNullOrWhiteSpace(alt))
+        if (element.GetAttribute("alt")?.Value is { } alt && !string.IsNullOrWhiteSpace(alt))
         {
             AppendText(alt, format);
         }
     }
 
-    private static bool IsTrackingPixel(IElement element) =>
+    private static bool IsTrackingPixel(HtmlElement element) =>
         ReadLength(element, "width") is { IsPercentage: false, Value: <= 1 } &&
         ReadLength(element, "height") is { IsPercentage: false, Value: <= 1 };
 
@@ -578,9 +578,9 @@ internal sealed partial class HtmlFlowBuilder
     /// The size the content asks an element for: the inline style if it says one, else the attribute
     /// of the same name, a style declaration winning over the attribute it duplicates.
     /// </summary>
-    private static HtmlLength? ReadLength(IElement element, string property) =>
-        ParseLength(ReadStyleProperty(element.GetAttribute("style"), property)) ??
-        ParseLength(element.GetAttribute(property));
+    private static HtmlLength? ReadLength(HtmlElement element, string property) =>
+        ParseLength(ReadStyleProperty(element.GetAttribute("style")?.Value, property)) ??
+        ParseLength(element.GetAttribute(property)?.Value);
 
     /// <summary>
     /// Reads one declaration out of an inline style. Deliberately crude — the style is split into

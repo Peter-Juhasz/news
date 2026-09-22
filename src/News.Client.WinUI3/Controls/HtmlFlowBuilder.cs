@@ -120,7 +120,7 @@ internal sealed partial class HtmlFlowBuilder : HtmlVisitor
 
         // Without a body the content is a fragment, and all of it is content; the head and its
         // children are dropped as ignored elements either way.
-        if (document.TryQuerySelector(out var body, name: "body"))
+        if (document.TryGetBody(out var body))
         {
             builder.VisitChildren(body, TextFormat.Default);
         }

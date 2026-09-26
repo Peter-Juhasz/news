@@ -84,18 +84,22 @@ public sealed class BookmarkStoreTests
                 CreateBookmark(new RssNewsSource("https://example.com/feed", TimeSpan.FromMinutes(30)), "1"),
                 CreateBookmark(new AtomNewsSource("https://example.com/atom", TimeSpan.FromMinutes(30)), "2"),
                 CreateBookmark(new RedditNewsSource("dotnet", TimeSpan.FromMinutes(15)), "3"),
-                CreateBookmark(new YouTubeNewsSource("UC-channel", TimeSpan.FromHours(1)), "4")
+                CreateBookmark(new YouTubeNewsSource("UC-channel", TimeSpan.FromHours(1)), "4"),
+                CreateBookmark(new GitHubNewsSource("dotnet/runtime", GitHubFeed.Pulls, TimeSpan.FromHours(1)), "5")
             ]),
             TestContext.CancellationToken);
 
         var bookmarks = await CreateStore().LoadAsync(TestContext.CancellationToken);
 
         Assert.IsNotNull(bookmarks);
-        Assert.HasCount(4, bookmarks.Items);
+        Assert.HasCount(5, bookmarks.Items);
         Assert.IsInstanceOfType<RssNewsSource>(bookmarks.Items[0].Source);
         Assert.IsInstanceOfType<AtomNewsSource>(bookmarks.Items[1].Source);
         Assert.IsInstanceOfType<RedditNewsSource>(bookmarks.Items[2].Source);
         Assert.IsInstanceOfType<YouTubeNewsSource>(bookmarks.Items[3].Source);
+        var gitHub = Assert.IsInstanceOfType<GitHubNewsSource>(bookmarks.Items[4].Source);
+        Assert.AreEqual("dotnet/runtime", gitHub.Repository);
+        Assert.AreEqual(GitHubFeed.Pulls, gitHub.Feed);
     }
 
     /// <summary>

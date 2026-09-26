@@ -21,3 +21,16 @@ groups:
         channelId: UCsBjURrPoezykLs9EqgamOA
         frequency: 01:00:00
         title: Fireship
+      - type: github
+        repository: dotnet/runtime
+        # Optional: releases (the default), tags, commits, issues or pulls. Commits are the default
+        # branch's. Issues and pulls come from GitHub's API, which allows 60 requests an hour
+        # without signing in, shared by every issues and pulls source.
+        feed: releases
+        frequency: 01:00:00
+        title: .NET Runtime releases
+      - type: github
+        repository: dotnet/runtime
+        feed: pulls
+        frequency: 00:30:00
+        title: .NET Runtime PRs

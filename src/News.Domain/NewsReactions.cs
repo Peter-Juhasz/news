@@ -1,3 +1,5 @@
+using System.Collections.Frozen;
+
 namespace News.Domain;
 
 /// <summary>
@@ -7,6 +9,7 @@ public static class NewsReactions
 {
     public const string Like = "Like";
 
-    public static IReadOnlyDictionary<string, long> None { get; } =
-        new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+    public const string Comment = "Comment";
+
+    public static readonly IReadOnlyDictionary<string, long> None = FrozenDictionary<string, long>.Empty;
 }

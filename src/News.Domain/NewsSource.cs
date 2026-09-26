@@ -17,6 +17,7 @@ namespace News.Domain;
 [JsonDerivedType(typeof(AtomNewsSource), "atom")]
 [JsonDerivedType(typeof(RedditNewsSource), "reddit")]
 [JsonDerivedType(typeof(YouTubeNewsSource), "youtube")]
+[JsonDerivedType(typeof(GitHubNewsSource), "github")]
 public abstract record NewsSource(TimeSpan Frequency)
 {
     /// <summary>
@@ -82,4 +83,25 @@ public sealed record YouTubeNewsSource(string ChannelId, TimeSpan Frequency) : N
 
     [JsonIgnore]
     public string FeedUrl => $"https://www.youtube.com/feeds/videos.xml?channel_id={Uri.EscapeDataString(ChannelId)}";
+}
+
+/// <param name="Repository">The repository as GitHub names it, owner first: <c>dotnet/runtime</c>.</param>
+public sealed record GitHubNewsSource(string Repository, GitHubFeed Feed, TimeSpan Frequency) : NewsSource(Frequency)
+{
+    [JsonIgnore]
+    public override string Key => $"github:{Repository}/{Feed.ToString().ToLowerInvariant()}";
+
+    /// <summary>
+    /// The Atom feed GitHub publishes for what this source follows. Null for issues and pull
+    /// requests, which GitHub publishes no feed for, so they are read from its REST API instead.
+    /// </summary>
+    [JsonIgnore]
+    public string? FeedUrl => Feed switch
+    {
+        GitHubFeed.Releases => $"https://github.com/{Repository}/releases.atom",
+        GitHubFeed.Tags => $"https://github.com/{Repository}/tags.atom",
+        // The repository's default branch, whatever it is called.
+        GitHubFeed.Commits => $"https://github.com/{Repository}/commits.atom",
+        _ => null
+    };
 }

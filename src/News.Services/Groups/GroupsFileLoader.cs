@@ -1,10 +1,11 @@
+using System.Text.RegularExpressions;
 using News.Domain;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
 namespace News.Groups;
 
-public sealed class GroupsFileLoader
+public sealed partial class GroupsFileLoader
 {
     private readonly IDeserializer _deserializer = new DeserializerBuilder()
         .WithNamingConvention(CamelCaseNamingConvention.Instance)
@@ -88,9 +89,49 @@ public sealed class GroupsFileLoader
                 Title = title,
                 View = view
             },
+            "github" => new GitHubNewsSource(
+                Repository: ParseRepository(RequireValue(source.Repository, "repository", groupTitle), groupTitle),
+                Feed: ParseGitHubFeed(source.Feed, groupTitle),
+                Frequency: source.Frequency)
+            {
+                Title = title,
+                View = view
+            },
             _ => throw new InvalidDataException(
-                $"Unsupported source type '{source.Type}' in group '{groupTitle}'. Expected 'rss', 'atom', 'reddit' or 'youtube'.")
+                $"Unsupported source type '{source.Type}' in group '{groupTitle}'. Expected 'rss', 'atom', 'reddit', 'youtube' or 'github'.")
         };
+    }
+
+    /// <summary>
+    /// Owner and name, and nothing else: the value is set into GitHub's URLs as it is written.
+    /// </summary>
+    private static string ParseRepository(string value, string groupTitle) =>
+        RepositoryRegex().IsMatch(value)
+            ? value
+            : throw new InvalidDataException(
+                $"Invalid repository '{value}' in group '{groupTitle}'. Expected owner and name, as in 'dotnet/runtime'.");
+
+    [GeneratedRegex("^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$")]
+    private static partial Regex RepositoryRegex();
+
+    /// <summary>
+    /// Releases where none is named, being what a repository publishes for its readers.
+    /// </summary>
+    private static GitHubFeed ParseGitHubFeed(string? value, string groupTitle)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return GitHubFeed.Releases;
+        }
+
+        // Names only: Enum.Parse would take a number too, a position in the list that reordering it
+        // would quietly change.
+        var name = Enum.GetNames<GitHubFeed>()
+            .FirstOrDefault(candidate => string.Equals(candidate, value.Trim(), StringComparison.OrdinalIgnoreCase))
+            ?? throw new InvalidDataException(
+                $"Unsupported feed '{value}' in group '{groupTitle}'. Expected 'releases', 'tags', 'commits', 'issues' or 'pulls'.");
+
+        return Enum.Parse<GitHubFeed>(name);
     }
 
     private static NewsContentMode? ParseView(string? value, string groupTitle)
@@ -143,6 +184,10 @@ public sealed class GroupsFileLoader
         public string? Subreddit { get; init; }
 
         public string? ChannelId { get; init; }
+
+        public string? Repository { get; init; }
+
+        public string? Feed { get; init; }
 
         public string? Title { get; init; }
 

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Xml;
 using Microsoft.Extensions.Logging;
 using News.Domain;
@@ -185,6 +186,10 @@ public sealed class NewsGroupViewModel(
         catch (XmlException exception)
         {
             logger.LogWarning(exception, "Feed XML parsing failed for source {SourceType}. Keeping last successful items.", source.GetType().Name);
+        }
+        catch (JsonException exception)
+        {
+            logger.LogWarning(exception, "Feed JSON parsing failed for source {SourceType}. Keeping last successful items.", source.GetType().Name);
         }
         catch (InvalidDataException exception)
         {

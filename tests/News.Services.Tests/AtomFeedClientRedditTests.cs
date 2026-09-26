@@ -5,7 +5,7 @@ namespace News.Services.Tests;
 /// media:thumbnail outside any media:group, and a link element with no rel attribute.
 /// </summary>
 [TestClass]
-public sealed class RssFeedClientRedditTests
+public sealed class AtomFeedClientRedditTests
 {
     private const string Feed = """
         <?xml version="1.0" encoding="UTF-8"?>
@@ -66,7 +66,7 @@ public sealed class RssFeedClientRedditTests
     [TestMethod]
     public async Task LoadAsync_RedditSubredditFeed_MapsEveryFieldOfTheEntry()
     {
-        var item = await FeedTestHost.LoadSingleItemAsync(
+        var item = await FeedTestHost.LoadSingleAtomItemAsync(
             Feed,
             "https://www.reddit.com/r/hungary.rss",
             TestContext.CancellationToken);

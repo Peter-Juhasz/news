@@ -88,7 +88,12 @@ public sealed class NewsItemViewModel : ObservableObject
     /// <summary>
     /// CSS selector the source configures for picking the body out of the item's own page.
     /// </summary>
-    public string? ContentSelector => (_source as RssNewsSource)?.Selector;
+    public string? ContentSelector => _source switch
+    {
+        RssNewsSource rss => rss.Selector,
+        AtomNewsSource atom => atom.Selector,
+        _ => null
+    };
 
     /// <summary>
     /// Whether this item's body is fetched from its page rather than taken from the feed: its

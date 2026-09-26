@@ -6,19 +6,40 @@ using News.Domain;
 namespace News.Services.Tests;
 
 /// <summary>
-/// Runs a feed document through the real <see cref="RssFeedClient"/>, serving it over a stubbed
-/// handler so the HTTP path is exercised alongside the parser.
+/// Runs a feed document through the real <see cref="RssFeedClient"/> or <see cref="AtomFeedClient"/>,
+/// serving it over a stubbed handler so the HTTP path is exercised alongside the parser.
 /// </summary>
 internal static class FeedTestHost
 {
-    public static async Task<NewsItem> LoadSingleItemAsync(
+    public static Task<NewsItem> LoadSingleRssItemAsync(
         string feed,
         string url,
+        CancellationToken cancellationToken) =>
+        LoadSingleItemAsync(
+            feed,
+            url,
+            httpClient => new RssFeedClient(httpClient, NullLogger<RssFeedClient>.Instance),
+            cancellationToken);
+
+    public static Task<NewsItem> LoadSingleAtomItemAsync(
+        string feed,
+        string url,
+        CancellationToken cancellationToken) =>
+        LoadSingleItemAsync(
+            feed,
+            url,
+            httpClient => new AtomFeedClient(httpClient, NullLogger<AtomFeedClient>.Instance),
+            cancellationToken);
+
+    private static async Task<NewsItem> LoadSingleItemAsync(
+        string feed,
+        string url,
+        Func<HttpClient, FeedClient> createClient,
         CancellationToken cancellationToken)
     {
         using var handler = new StubHttpMessageHandler(feed);
         using var httpClient = new HttpClient(handler);
-        var client = new RssFeedClient(httpClient, NullLogger<RssFeedClient>.Instance);
+        var client = createClient(httpClient);
 
         var items = await client.LoadAsync(url, cancellationToken);
 

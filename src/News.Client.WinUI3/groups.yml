@@ -1,12 +1,13 @@
 groups:
   - title: Tech
     sources:
+      # rss for an RSS 2.0 feed; a feed whose root element is <feed> is Atom, and takes atom.
       - type: rss
         url: https://devblogs.microsoft.com/dotnet/feed/
         frequency: 00:30:00
         # Optional: shown in the details pane instead of the article's host name.
         title: .NET Blog
-        # Optional, rss only: a CSS selector for the article body in the page an item links to.
+        # Optional, rss and atom only: a CSS selector for the article body in the page an item links to.
         # Where it is set, the body is fetched from that page instead of read from the feed —
         # for the feeds that publish no more than a teaser.
         # selector: article .entry-content

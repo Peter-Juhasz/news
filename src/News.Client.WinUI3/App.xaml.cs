@@ -91,18 +91,8 @@ public partial class App : Application
         builder.Services.AddSingleton<IBookmarkStore, BookmarkStore>();
         builder.Services.AddSingleton<IBookmarkService, BookmarkService>();
 
-        builder.Services
-            .AddHttpClient<IRssFeedClient, RssFeedClient>(httpClient =>
-            {
-                httpClient.Timeout = TimeSpan.FromSeconds(30);
-                httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("News.Client.WinUI3/1.0");
-            })
-            .AddStandardResilienceHandler(options =>
-            {
-                options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(10);
-                options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(30);
-                options.Retry.MaxRetryAttempts = 3;
-            });
+        AddFeedClient(builder.Services.AddHttpClient<IRssFeedClient, RssFeedClient>());
+        AddFeedClient(builder.Services.AddHttpClient<IAtomFeedClient, AtomFeedClient>());
 
         // Article pages are heavier than a feed and are fetched while the reader waits, so this
         // one gives an attempt longer to finish and retries it fewer times.
@@ -122,4 +112,22 @@ public partial class App : Application
 
         return builder.Build();
     }
+
+    /// <summary>
+    /// The RSS and Atom clients fetch alike, so they are given the same client settings and
+    /// the same patience with a slow or failing feed.
+    /// </summary>
+    private static void AddFeedClient(IHttpClientBuilder builder) =>
+        builder
+            .ConfigureHttpClient(httpClient =>
+            {
+                httpClient.Timeout = TimeSpan.FromSeconds(30);
+                httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("News.Client.WinUI3/1.0");
+            })
+            .AddStandardResilienceHandler(options =>
+            {
+                options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(10);
+                options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(30);
+                options.Retry.MaxRetryAttempts = 3;
+            });
 }

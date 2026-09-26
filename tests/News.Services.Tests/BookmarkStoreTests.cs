@@ -82,18 +82,20 @@ public sealed class BookmarkStoreTests
         await store.SaveAsync(
             new BookmarkCollection([
                 CreateBookmark(new RssNewsSource("https://example.com/feed", TimeSpan.FromMinutes(30)), "1"),
-                CreateBookmark(new RedditNewsSource("dotnet", TimeSpan.FromMinutes(15)), "2"),
-                CreateBookmark(new YouTubeNewsSource("UC-channel", TimeSpan.FromHours(1)), "3")
+                CreateBookmark(new AtomNewsSource("https://example.com/atom", TimeSpan.FromMinutes(30)), "2"),
+                CreateBookmark(new RedditNewsSource("dotnet", TimeSpan.FromMinutes(15)), "3"),
+                CreateBookmark(new YouTubeNewsSource("UC-channel", TimeSpan.FromHours(1)), "4")
             ]),
             TestContext.CancellationToken);
 
         var bookmarks = await CreateStore().LoadAsync(TestContext.CancellationToken);
 
         Assert.IsNotNull(bookmarks);
-        Assert.HasCount(3, bookmarks.Items);
+        Assert.HasCount(4, bookmarks.Items);
         Assert.IsInstanceOfType<RssNewsSource>(bookmarks.Items[0].Source);
-        Assert.IsInstanceOfType<RedditNewsSource>(bookmarks.Items[1].Source);
-        Assert.IsInstanceOfType<YouTubeNewsSource>(bookmarks.Items[2].Source);
+        Assert.IsInstanceOfType<AtomNewsSource>(bookmarks.Items[1].Source);
+        Assert.IsInstanceOfType<RedditNewsSource>(bookmarks.Items[2].Source);
+        Assert.IsInstanceOfType<YouTubeNewsSource>(bookmarks.Items[3].Source);
     }
 
     /// <summary>

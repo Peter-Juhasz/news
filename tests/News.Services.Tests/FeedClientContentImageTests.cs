@@ -5,7 +5,7 @@ namespace News.Services.Tests;
 /// only place an image can be found.
 /// </summary>
 [TestClass]
-public sealed class RssFeedClientContentImageTests
+public sealed class FeedClientContentImageTests
 {
     private const string ImageUrl =
         "https://example.com/photos/lead.jpg?width=640&crop=smart";
@@ -70,7 +70,7 @@ public sealed class RssFeedClientContentImageTests
     [TestMethod]
     public async Task LoadAsync_RssItemWithoutMediaImage_FallsBackToTheFirstImageInTheContent()
     {
-        var item = await FeedTestHost.LoadSingleItemAsync(
+        var item = await FeedTestHost.LoadSingleRssItemAsync(
             RssFeed,
             "https://example.com/rss",
             TestContext.CancellationToken);
@@ -82,7 +82,7 @@ public sealed class RssFeedClientContentImageTests
     [TestMethod]
     public async Task LoadAsync_EntryWithMediaThumbnail_PrefersItOverTheContentImage()
     {
-        var item = await FeedTestHost.LoadSingleItemAsync(
+        var item = await FeedTestHost.LoadSingleAtomItemAsync(
             AtomFeed,
             "https://example.com/atom",
             TestContext.CancellationToken);
@@ -93,7 +93,7 @@ public sealed class RssFeedClientContentImageTests
     [TestMethod]
     public async Task LoadAsync_ItemWithNoImageAnywhere_LeavesTheImageUrlUnset()
     {
-        var item = await FeedTestHost.LoadSingleItemAsync(
+        var item = await FeedTestHost.LoadSingleRssItemAsync(
             ImagelessRssFeed,
             "https://example.com/rss",
             TestContext.CancellationToken);

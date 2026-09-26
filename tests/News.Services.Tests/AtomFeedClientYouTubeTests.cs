@@ -7,7 +7,7 @@ namespace News.Services.Tests;
 /// view count live in Media RSS, which is why the parser falls back to media:group.
 /// </summary>
 [TestClass]
-public sealed class RssFeedClientYouTubeTests
+public sealed class AtomFeedClientYouTubeTests
 {
     private const string Feed = """
         <?xml version="1.0" encoding="UTF-8"?>
@@ -79,7 +79,7 @@ public sealed class RssFeedClientYouTubeTests
     [TestMethod]
     public async Task LoadAsync_YouTubeChannelFeed_MapsEveryFieldOfTheEntry()
     {
-        var item = await FeedTestHost.LoadSingleItemAsync(
+        var item = await FeedTestHost.LoadSingleAtomItemAsync(
             Feed,
             "https://www.youtube.com/feeds/videos.xml?channel_id=UC7kIy8fZavEni8Gzl8NLjOQ",
             TestContext.CancellationToken);
@@ -131,7 +131,7 @@ public sealed class RssFeedClientYouTubeTests
             </feed>
             """;
 
-        var item = await FeedTestHost.LoadSingleItemAsync(
+        var item = await FeedTestHost.LoadSingleAtomItemAsync(
             feed,
             "https://example.com/reviews.atom",
             TestContext.CancellationToken);

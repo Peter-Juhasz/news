@@ -14,6 +14,7 @@ namespace News.Domain;
 /// </remarks>
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
 [JsonDerivedType(typeof(RssNewsSource), "rss")]
+[JsonDerivedType(typeof(AtomNewsSource), "atom")]
 [JsonDerivedType(typeof(RedditNewsSource), "reddit")]
 [JsonDerivedType(typeof(YouTubeNewsSource), "youtube")]
 public abstract record NewsSource(TimeSpan Frequency)
@@ -43,6 +44,19 @@ public sealed record RssNewsSource(string Url, TimeSpan Frequency) : NewsSource(
 {
     [JsonIgnore]
     public override string Key => $"rss:{Url}";
+
+    /// <summary>
+    /// CSS selector picking the article body out of the page an item links to. Optional; where it
+    /// is set, the body shown for an item is fetched from its own page instead of read from the
+    /// feed, for the feeds that publish no more than a teaser.
+    /// </summary>
+    public string? Selector { get; init; }
+}
+
+public sealed record AtomNewsSource(string Url, TimeSpan Frequency) : NewsSource(Frequency)
+{
+    [JsonIgnore]
+    public override string Key => $"atom:{Url}";
 
     /// <summary>
     /// CSS selector picking the article body out of the page an item links to. Optional; where it

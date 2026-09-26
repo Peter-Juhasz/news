@@ -54,6 +54,7 @@ public sealed class GroupsFileLoader
 
         var title = string.IsNullOrWhiteSpace(source.Title) ? null : source.Title.Trim();
         var view = ParseView(source.View, groupTitle);
+        var selector = string.IsNullOrWhiteSpace(source.Selector) ? null : source.Selector.Trim();
 
         return source.Type.Trim().ToLowerInvariant() switch
         {
@@ -63,7 +64,15 @@ public sealed class GroupsFileLoader
             {
                 Title = title,
                 View = view,
-                Selector = string.IsNullOrWhiteSpace(source.Selector) ? null : source.Selector.Trim()
+                Selector = selector
+            },
+            "atom" => new AtomNewsSource(
+                Url: RequireValue(source.Url, "url", groupTitle),
+                Frequency: source.Frequency)
+            {
+                Title = title,
+                View = view,
+                Selector = selector
             },
             "reddit" => new RedditNewsSource(
                 Subreddit: RequireValue(source.Subreddit, "subreddit", groupTitle),
@@ -80,7 +89,7 @@ public sealed class GroupsFileLoader
                 View = view
             },
             _ => throw new InvalidDataException(
-                $"Unsupported source type '{source.Type}' in group '{groupTitle}'. Expected 'rss', 'reddit' or 'youtube'.")
+                $"Unsupported source type '{source.Type}' in group '{groupTitle}'. Expected 'rss', 'atom', 'reddit' or 'youtube'.")
         };
     }
 

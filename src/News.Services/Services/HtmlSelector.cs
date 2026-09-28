@@ -3,14 +3,13 @@ using PeterJuhasz.Text.Html.Model;
 namespace News.Services;
 
 /// <summary>
-/// Runs a selector against a parsed page. The parser matches one compound selector at a time — an
-/// element name or <c>*</c>, then classes, IDs and exact attribute values — so the descendant
-/// combinator is added here: each compound is looked for inside what the one before it matched.
+/// Runs a selector against a parsed page. Each compound selector is handed to the parser on its
+/// own, and the descendant combinator is added here: each compound is looked for inside what the
+/// one before it matched.
 /// </summary>
 /// <remarks>
-/// That covers what a source is likely to be written with, such as <c>ul.news li</c>. Child and
-/// sibling combinators, selector lists and pseudo-classes are not supported, and are turned away
-/// when the groups file is read rather than when a page is.
+/// That covers what a source is likely to be written with, such as <c>ul.news li</c>. A compound
+/// the parser cannot read is turned away when the groups file is read rather than when a page is.
 /// </remarks>
 internal static class HtmlSelector
 {

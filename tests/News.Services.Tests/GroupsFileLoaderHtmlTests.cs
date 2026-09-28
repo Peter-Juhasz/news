@@ -81,31 +81,26 @@ public sealed class GroupsFileLoaderHtmlTests
     }
 
     [TestMethod]
-    [DataRow("ul > li")]
-    [DataRow("li:first-child")]
-    [DataRow("h2, h3")]
-    [DataRow("a[href^=http]")]
-    [DataRow("article[")]
-    public void LoadFromPath_ItemSelectorBeyondWhatTheParserTakes_Throws(string selector)
+    public void LoadFromPath_ItemSelectorTheParserCannotRead_Throws()
     {
-        WriteSources($"""
+        WriteSources("""
             - type: html
               url: https://example.com/news
-              item: "{selector}"
+              item: "article["
             """);
 
         Assert.ThrowsExactly<InvalidDataException>(() => new GroupsFileLoader().LoadFromPath(_filePath));
     }
 
     [TestMethod]
-    public void LoadFromPath_PropertySelectorBeyondWhatTheParserTakes_Throws()
+    public void LoadFromPath_PropertySelectorTheParserCannotRead_Throws()
     {
         WriteSources("""
             - type: html
               url: https://example.com/news
               item: article
               properties:
-                date: "time:first-of-type"
+                date: "time["
             """);
 
         Assert.ThrowsExactly<InvalidDataException>(() => new GroupsFileLoader().LoadFromPath(_filePath));

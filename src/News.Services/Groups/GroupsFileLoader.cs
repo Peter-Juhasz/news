@@ -155,7 +155,7 @@ public sealed partial class GroupsFileLoader
         HtmlSelector.IsSupported(value)
             ? value
             : throw new InvalidDataException(
-                $"Unsupported selector '{value}' for '{fieldName}' in group '{groupTitle}'. Expected an element name, classes, IDs and exact attribute values, with descendants separated by spaces, as in 'ul.news li'.");
+                $"Unsupported selector '{value}' for '{fieldName}' in group '{groupTitle}'. Expected CSS selectors the HTML parser supports, with descendants separated by spaces, as in 'ul.news li'.");
 
     private static string? ParseOptionalSelector(string? value, string fieldName, string groupTitle) =>
         string.IsNullOrWhiteSpace(value) ? null : ParseSelector(value.Trim(), fieldName, groupTitle);

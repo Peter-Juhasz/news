@@ -36,7 +36,7 @@ public sealed class ObservableListReconcilerTests
     public void Reconcile_EntriesAddedAtTheFront_KeepsTheEntriesItAlreadyHeld()
     {
         var target = Rows("b", "c");
-        var held = target.ToList();
+        var held = new List<Row>(target);
         var changes = new ChangeLog(target);
 
         Reconcile(target, [Row.Of("a"), Row.Of("b"), Row.Of("c")]);
@@ -52,7 +52,7 @@ public sealed class ObservableListReconcilerTests
     public void Reconcile_EntryTakenOutOfTheMiddle_LeavesTheRestWhereTheyAre()
     {
         var target = Rows("a", "b", "c");
-        var held = target.ToList();
+        var held = new List<Row>(target);
 
         Reconcile(target, [Row.Of("a"), Row.Of("c")]);
 
@@ -65,7 +65,7 @@ public sealed class ObservableListReconcilerTests
     public void Reconcile_EntriesInAnotherOrder_MovesThemWithoutRebuildingThem()
     {
         var target = Rows("a", "b", "c");
-        var held = target.ToList();
+        var held = new List<Row>(target);
 
         Reconcile(target, [Row.Of("c"), Row.Of("a"), Row.Of("b")]);
 

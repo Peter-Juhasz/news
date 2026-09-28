@@ -82,6 +82,8 @@ public partial class App : Application
         // Microsoft.UI.Xaml.ElementTheme, a WinUI type News.Services cannot take a dependency on.
         builder.Services.Configure<AppearanceOptions>(builder.Configuration.GetSection(AppearanceOptions.SectionName));
 
+        builder.Services.Configure<XOptions>(builder.Configuration.GetSection(XOptions.SectionName));
+
         builder.Services.AddSingleton<MainViewModel>();
         builder.Services.AddSingleton<MainWindow>();
         builder.Services.AddSingleton<GroupsFileLoader>();
@@ -95,6 +97,12 @@ public partial class App : Application
         AddFeedClient(builder.Services.AddHttpClient<IAtomFeedClient, AtomFeedClient>());
         AddFeedClient(builder.Services.AddHttpClient<IGitHubIssueClient, GitHubIssueClient>());
         AddFeedClient(builder.Services.AddHttpClient<IHtmlPageClient, HtmlPageClient>());
+
+        // Signed outside the resilience handler, so the request for the app's token is given the
+        // same patience as the ones it signs, and a missing key fails at once rather than retried.
+        builder.Services.AddSingleton<XAccessTokenCache>();
+        builder.Services.AddTransient<XAuthenticationHandler>();
+        AddFeedClient(builder.Services.AddHttpClient<IXClient, XClient>().AddHttpMessageHandler<XAuthenticationHandler>());
 
         // Article pages are heavier than a feed and are fetched while the reader waits, so this
         // one gives an attempt longer to finish and retries it fewer times.
@@ -116,7 +124,7 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// The RSS, Atom, GitHub and HTML page clients fetch alike, so they are given the same client
+    /// The RSS, Atom, GitHub, HTML page and X clients fetch alike, so they are given the same client
     /// settings and the same patience with a slow or failing feed. GitHub's API turns away a
     /// request without the user agent set here.
     /// </summary>

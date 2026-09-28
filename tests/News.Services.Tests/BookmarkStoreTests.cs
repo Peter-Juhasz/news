@@ -94,14 +94,16 @@ public sealed class BookmarkStoreTests
                     {
                         TitleSelector = "h2"
                     },
-                    "6")
+                    "6"),
+                CreateBookmark(new XNewsSource("XDevelopers", TimeSpan.FromHours(1)), "7"),
+                CreateBookmark(new XSearchNewsSource("#dotnet -is:retweet", TimeSpan.FromHours(1)), "8")
             ]),
             TestContext.CancellationToken);
 
         var bookmarks = await CreateStore().LoadAsync(TestContext.CancellationToken);
 
         Assert.IsNotNull(bookmarks);
-        Assert.HasCount(6, bookmarks.Items);
+        Assert.HasCount(8, bookmarks.Items);
         Assert.IsInstanceOfType<RssNewsSource>(bookmarks.Items[0].Source);
         Assert.IsInstanceOfType<AtomNewsSource>(bookmarks.Items[1].Source);
         Assert.IsInstanceOfType<RedditNewsSource>(bookmarks.Items[2].Source);
@@ -112,6 +114,10 @@ public sealed class BookmarkStoreTests
         var html = Assert.IsInstanceOfType<HtmlNewsSource>(bookmarks.Items[5].Source);
         Assert.AreEqual("ul.stories li", html.ItemSelector);
         Assert.AreEqual("h2", html.TitleSelector);
+        var x = Assert.IsInstanceOfType<XNewsSource>(bookmarks.Items[6].Source);
+        Assert.AreEqual("XDevelopers", x.Username);
+        var xSearch = Assert.IsInstanceOfType<XSearchNewsSource>(bookmarks.Items[7].Source);
+        Assert.AreEqual("#dotnet -is:retweet", xSearch.Query);
     }
 
     /// <summary>

@@ -6,7 +6,8 @@ public sealed class NewsSourceClient(
     IRssFeedClient rssFeedClient,
     IAtomFeedClient atomFeedClient,
     IGitHubIssueClient gitHubIssueClient,
-    IHtmlPageClient htmlPageClient)
+    IHtmlPageClient htmlPageClient,
+    IXClient xClient)
     : INewsSourceClient
 {
     public Task<IReadOnlyList<NewsItem>> LoadAsync(NewsSource source, CancellationToken cancellationToken) =>
@@ -23,6 +24,8 @@ public sealed class NewsSourceClient(
             GitHubNewsSource { Feed: GitHubFeed.Pulls } gitHub =>
                 gitHubIssueClient.LoadPullRequestsAsync(gitHub.Repository, cancellationToken),
             HtmlNewsSource html => htmlPageClient.LoadAsync(html, cancellationToken),
+            XNewsSource x => xClient.LoadUserPostsAsync(x.Username, cancellationToken),
+            XSearchNewsSource xSearch => xClient.SearchAsync(xSearch.Query, cancellationToken),
             _ => throw new NotSupportedException($"Unsupported source type: {source.GetType().Name}.")
         };
 }

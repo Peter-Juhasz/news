@@ -111,10 +111,41 @@ public sealed partial class GroupsFileLoader
                 LeadSelector = ParseOptionalSelector(source.Properties?.Lead, "properties.lead", groupTitle),
                 UrlSelector = ParseOptionalSelector(source.Properties?.Url, "properties.url", groupTitle)
             },
+            "x" => new XNewsSource(
+                Username: ParseUsername(RequireValue(source.Username, "username", groupTitle), groupTitle),
+                Frequency: source.Frequency)
+            {
+                Title = title,
+                View = view
+            },
+            "x-search" => new XSearchNewsSource(
+                Query: RequireValue(source.Query, "query", groupTitle),
+                Frequency: source.Frequency)
+            {
+                Title = title,
+                View = view
+            },
             _ => throw new InvalidDataException(
-                $"Unsupported source type '{source.Type}' in group '{groupTitle}'. Expected 'rss', 'atom', 'reddit', 'youtube', 'github' or 'html'.")
+                $"Unsupported source type '{source.Type}' in group '{groupTitle}'. Expected 'rss', 'atom', 'reddit', 'youtube', 'github', 'html', 'x' or 'x-search'.")
         };
     }
+
+    /// <summary>
+    /// A handle as X allows one, with or without the @ it is written with: the value is set into
+    /// X's URLs as it is written.
+    /// </summary>
+    private static string ParseUsername(string value, string groupTitle)
+    {
+        var username = value.TrimStart('@');
+
+        return UsernameRegex().IsMatch(username)
+            ? username
+            : throw new InvalidDataException(
+                $"Invalid username '{value}' in group '{groupTitle}'. Expected a handle on X, as in 'XDevelopers'.");
+    }
+
+    [GeneratedRegex("^[A-Za-z0-9_]{1,15}$")]
+    private static partial Regex UsernameRegex();
 
     /// <summary>
     /// A selector the page's parser can run. One it cannot is turned away here, where it is written,
@@ -215,6 +246,10 @@ public sealed partial class GroupsFileLoader
         public string? Repository { get; init; }
 
         public string? Feed { get; init; }
+
+        public string? Username { get; init; }
+
+        public string? Query { get; init; }
 
         public string? Title { get; init; }
 

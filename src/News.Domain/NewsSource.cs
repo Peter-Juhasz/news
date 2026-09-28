@@ -19,6 +19,8 @@ namespace News.Domain;
 [JsonDerivedType(typeof(YouTubeNewsSource), "youtube")]
 [JsonDerivedType(typeof(GitHubNewsSource), "github")]
 [JsonDerivedType(typeof(HtmlNewsSource), "html")]
+[JsonDerivedType(typeof(XNewsSource), "x")]
+[JsonDerivedType(typeof(XSearchNewsSource), "x-search")]
 public abstract record NewsSource(TimeSpan Frequency)
 {
     /// <summary>
@@ -153,4 +155,24 @@ public sealed record HtmlNewsSource(string Url, string ItemSelector, TimeSpan Fr
     /// the feeds, where it is set the body shown for a story is fetched from its own page.
     /// </summary>
     public string? Selector { get; init; }
+}
+
+/// <summary>
+/// The newest posts of an account on X, read from X's API.
+/// </summary>
+/// <param name="Username">The account's handle, without the <c>@</c>: <c>XDevelopers</c>.</param>
+public sealed record XNewsSource(string Username, TimeSpan Frequency) : NewsSource(Frequency)
+{
+    [JsonIgnore]
+    public override string Key => $"x:{Username}";
+}
+
+/// <summary>
+/// The newest posts on X matching a search, read from X's API.
+/// </summary>
+/// <param name="Query">The search in X's query language, as in <c>#dotnet -is:retweet lang:en</c>.</param>
+public sealed record XSearchNewsSource(string Query, TimeSpan Frequency) : NewsSource(Frequency)
+{
+    [JsonIgnore]
+    public override string Key => $"x-search:{Query}";
 }

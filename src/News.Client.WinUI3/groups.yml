@@ -51,3 +51,16 @@ groups:
       #     date: time
       #     lead: p.summary
       #     url: h2 a
+      # x for an account's newest posts on X, leaving out its replies and reposts. It and x-search
+      # read X's API as an X app, whose API key and secret are set as X__ApiKey and X__ApiSecret in
+      # the environment or the .env file. X charges for each post a load returns, though not again
+      # for one it already returned the same (UTC) day.
+      # - type: x
+      #   username: XDevelopers
+      #   frequency: 01:00:00
+      #   title: X Developers
+      # x-search for the newest posts matching a search in X's query language, from the whole archive.
+      # - type: x-search
+      #   query: "#dotnet -is:retweet -is:reply lang:en"
+      #   frequency: 01:00:00
+      #   title: "#dotnet on X"

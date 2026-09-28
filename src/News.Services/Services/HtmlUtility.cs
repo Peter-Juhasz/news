@@ -57,8 +57,14 @@ public static partial class HtmlUtility
 
         var withoutTags = HtmlTagRegex().Replace(content, " ");
         var decoded = WebUtility.HtmlDecode(withoutTags);
-        return MultiWhitespaceRegex().Replace(decoded, " ").Trim();
+        return CollapseWhitespace(decoded);
     }
+
+    /// <summary>
+    /// Text with every run of whitespace in it made a single space, as a browser shows it.
+    /// </summary>
+    public static string CollapseWhitespace(string text) =>
+        MultiWhitespaceRegex().Replace(text, " ").Trim();
 
     public static bool LooksLikeHtml(string? content) =>
         !string.IsNullOrWhiteSpace(content) &&

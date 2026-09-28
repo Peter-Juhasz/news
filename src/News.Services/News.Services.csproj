@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -15,6 +15,16 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.*" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="10.*" />
     <PackageReference Include="YamlDotNet" Version="16.*" />
+  </ItemGroup>
+
+  <!-- The HTML parser depends on PeterJuhasz.Extensions, which adds members to System.Linq: among
+       them a ToList() on IReadOnlyList<T> that hands back the list itself rather than a copy, and a
+       Select() that runs at once. Compiled against, they would quietly take over calls written for
+       LINQ's, here and in every project referencing this one, so the parser brings them along only
+       to run. -->
+  <ItemGroup>
+    <PackageReference Include="PeterJuhasz.Text.Html" Version="1.*-*" />
+    <PackageReference Include="PeterJuhasz.Extensions" Version="2.*-*" />
   </ItemGroup>
 
   <ItemGroup>

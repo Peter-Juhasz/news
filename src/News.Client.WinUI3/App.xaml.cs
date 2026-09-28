@@ -94,6 +94,7 @@ public partial class App : Application
         AddFeedClient(builder.Services.AddHttpClient<IRssFeedClient, RssFeedClient>());
         AddFeedClient(builder.Services.AddHttpClient<IAtomFeedClient, AtomFeedClient>());
         AddFeedClient(builder.Services.AddHttpClient<IGitHubIssueClient, GitHubIssueClient>());
+        AddFeedClient(builder.Services.AddHttpClient<IHtmlPageClient, HtmlPageClient>());
 
         // Article pages are heavier than a feed and are fetched while the reader waits, so this
         // one gives an attempt longer to finish and retries it fewer times.
@@ -115,9 +116,9 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// The RSS, Atom and GitHub clients fetch alike, so they are given the same client settings
-    /// and the same patience with a slow or failing feed. GitHub's API turns away a request
-    /// without the user agent set here.
+    /// The RSS, Atom, GitHub and HTML page clients fetch alike, so they are given the same client
+    /// settings and the same patience with a slow or failing feed. GitHub's API turns away a
+    /// request without the user agent set here.
     /// </summary>
     private static void AddFeedClient(IHttpClientBuilder builder) =>
         builder

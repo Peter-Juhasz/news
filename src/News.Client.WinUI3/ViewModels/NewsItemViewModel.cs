@@ -92,6 +92,7 @@ public sealed class NewsItemViewModel : ObservableObject
     {
         RssNewsSource rss => rss.Selector,
         AtomNewsSource atom => atom.Selector,
+        HtmlNewsSource html => html.Selector,
         _ => null
     };
 

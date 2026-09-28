@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using News.Domain;
+using News.Services;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
@@ -97,10 +98,36 @@ public sealed partial class GroupsFileLoader
                 Title = title,
                 View = view
             },
+            "html" => new HtmlNewsSource(
+                Url: RequireValue(source.Url, "url", groupTitle),
+                ItemSelector: ParseSelector(RequireValue(source.Item, "item", groupTitle), "item", groupTitle),
+                Frequency: source.Frequency)
+            {
+                Title = title,
+                View = view,
+                Selector = selector,
+                TitleSelector = ParseOptionalSelector(source.Properties?.Title, "properties.title", groupTitle),
+                DateSelector = ParseOptionalSelector(source.Properties?.Date, "properties.date", groupTitle),
+                LeadSelector = ParseOptionalSelector(source.Properties?.Lead, "properties.lead", groupTitle),
+                UrlSelector = ParseOptionalSelector(source.Properties?.Url, "properties.url", groupTitle)
+            },
             _ => throw new InvalidDataException(
-                $"Unsupported source type '{source.Type}' in group '{groupTitle}'. Expected 'rss', 'atom', 'reddit', 'youtube' or 'github'.")
+                $"Unsupported source type '{source.Type}' in group '{groupTitle}'. Expected 'rss', 'atom', 'reddit', 'youtube', 'github' or 'html'.")
         };
     }
+
+    /// <summary>
+    /// A selector the page's parser can run. One it cannot is turned away here, where it is written,
+    /// rather than failing every load of the page after.
+    /// </summary>
+    private static string ParseSelector(string value, string fieldName, string groupTitle) =>
+        HtmlSelector.IsSupported(value)
+            ? value
+            : throw new InvalidDataException(
+                $"Unsupported selector '{value}' for '{fieldName}' in group '{groupTitle}'. Expected an element name, classes, IDs and exact attribute values, with descendants separated by spaces, as in 'ul.news li'.");
+
+    private static string? ParseOptionalSelector(string? value, string fieldName, string groupTitle) =>
+        string.IsNullOrWhiteSpace(value) ? null : ParseSelector(value.Trim(), fieldName, groupTitle);
 
     /// <summary>
     /// Owner and name, and nothing else: the value is set into GitHub's URLs as it is written.
@@ -194,5 +221,24 @@ public sealed partial class GroupsFileLoader
         public string? View { get; init; }
 
         public string? Selector { get; init; }
+
+        public string? Item { get; init; }
+
+        public ItemPropertiesDefinition? Properties { get; init; }
+    }
+
+    /// <summary>
+    /// Selectors for the properties of a story an HTML source picks out of its page, each run
+    /// inside the story's element.
+    /// </summary>
+    private sealed class ItemPropertiesDefinition
+    {
+        public string? Title { get; init; }
+
+        public string? Date { get; init; }
+
+        public string? Lead { get; init; }
+
+        public string? Url { get; init; }
     }
 }

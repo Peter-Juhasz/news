@@ -18,6 +18,7 @@ namespace News.Domain;
 [JsonDerivedType(typeof(RedditNewsSource), "reddit")]
 [JsonDerivedType(typeof(YouTubeNewsSource), "youtube")]
 [JsonDerivedType(typeof(GitHubNewsSource), "github")]
+[JsonDerivedType(typeof(HtmlNewsSource), "html")]
 public abstract record NewsSource(TimeSpan Frequency)
 {
     /// <summary>
@@ -104,4 +105,52 @@ public sealed record GitHubNewsSource(string Repository, GitHubFeed Feed, TimeSp
         GitHubFeed.Commits => $"https://github.com/{Repository}/commits.atom",
         _ => null
     };
+}
+
+/// <summary>
+/// A web page listing stories it publishes no feed for. Each story is an element the item
+/// selector picks out of the page, and its properties are picked out of that element in turn.
+/// </summary>
+/// <remarks>
+/// The item and property selectors take an element name, classes, IDs and exact attribute values,
+/// and descendants of those separated by spaces — not the whole of CSS.
+/// </remarks>
+/// <param name="Url">The page listing the stories.</param>
+/// <param name="ItemSelector">Picks each story out of the page.</param>
+public sealed record HtmlNewsSource(string Url, string ItemSelector, TimeSpan Frequency) : NewsSource(Frequency)
+{
+    [JsonIgnore]
+    public override string Key => $"html:{Url}";
+
+    /// <summary>
+    /// Picks the story's title out of its element. Optional; where it is unset, the title is the
+    /// element's text as a whole, for a story that is nothing but a headline.
+    /// </summary>
+    public string? TitleSelector { get; init; }
+
+    /// <summary>
+    /// Picks the story's date out of its element, read from a <c>datetime</c> or <c>content</c>
+    /// attribute where it has one and from its text otherwise. Optional; a story without a date
+    /// is dated when it is loaded.
+    /// </summary>
+    public string? DateSelector { get; init; }
+
+    /// <summary>
+    /// Picks the story's teaser out of its element. Optional; a story without one has no body
+    /// beyond its title, unless <see cref="Selector"/> fetches one.
+    /// </summary>
+    public string? LeadSelector { get; init; }
+
+    /// <summary>
+    /// Picks the story's link out of its element, the address being the <c>href</c> of that
+    /// element or else of the first link inside it. Optional; where it is unset, the link is the
+    /// story's element itself or the first link inside it.
+    /// </summary>
+    public string? UrlSelector { get; init; }
+
+    /// <summary>
+    /// CSS selector picking the article body out of the page a story links to. Optional; as with
+    /// the feeds, where it is set the body shown for a story is fetched from its own page.
+    /// </summary>
+    public string? Selector { get; init; }
 }

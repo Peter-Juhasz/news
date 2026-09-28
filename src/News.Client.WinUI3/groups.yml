@@ -7,7 +7,7 @@ groups:
         frequency: 00:30:00
         # Optional: shown in the details pane instead of the article's host name.
         title: .NET Blog
-        # Optional, rss and atom only: a CSS selector for the article body in the page an item links to.
+        # Optional, rss, atom and html only: a CSS selector for the article body in the page an item links to.
         # Where it is set, the body is fetched from that page instead of read from the feed —
         # for the feeds that publish no more than a teaser.
         # selector: article .entry-content
@@ -34,3 +34,20 @@ groups:
         feed: pulls
         frequency: 00:30:00
         title: .NET Runtime PRs
+      # html for a page that lists stories without publishing a feed. Its selectors take an element
+      # name, classes, IDs and exact attribute values, and descendants of those separated by spaces.
+      # - type: html
+      #   url: https://example.com/news
+      #   frequency: 01:00:00
+      #   title: Example News
+      #   # Picks each story out of the page.
+      #   item: ul.stories li
+      #   # Optional, each picked out of the story. Without a title, the story's whole text is its
+      #   # title; without a url, its link is the story itself or the first link inside it. A date
+      #   # is read from a datetime attribute, as on <time>, or else from the text, in the language
+      #   # the page declares; a story without one is dated when it is loaded.
+      #   properties:
+      #     title: h2
+      #     date: time
+      #     lead: p.summary
+      #     url: h2 a

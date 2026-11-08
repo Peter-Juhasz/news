@@ -398,7 +398,41 @@ public sealed partial class MainWindow : Window
         }
 
 		AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico"));
+
+        LimitInitialWidth();
 	}
+
+    /// <summary>
+    /// The widest the window opens, in effective pixels. Windows sizes a new window from the
+    /// display it opens on, which on a wide monitor leaves lines of text too long to read.
+    /// </summary>
+    private const double MaxInitialWidth = 1600;
+
+    /// <summary>
+    /// Narrows the window to <see cref="MaxInitialWidth"/> when Windows would open it wider, and
+    /// centers it on the display's work area. The reader may still widen it afterwards.
+    /// </summary>
+    private void LimitInitialWidth()
+    {
+        var scale = GetDpiForWindow(WinRT.Interop.WindowNative.GetWindowHandle(this)) / 96.0;
+        var maxWidth = (int)(MaxInitialWidth * scale);
+        var size = AppWindow.Size;
+        if (size.Width <= maxWidth)
+        {
+            return;
+        }
+
+        var workArea = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
+        var height = Math.Min(size.Height, workArea.Height);
+        AppWindow.MoveAndResize(new(
+            workArea.X + (workArea.Width - maxWidth) / 2,
+            workArea.Y + (workArea.Height - height) / 2,
+            maxWidth,
+            height));
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern uint GetDpiForWindow(nint hwnd);
 
     private async Task EnsureWebViewReadyAsync()
     {

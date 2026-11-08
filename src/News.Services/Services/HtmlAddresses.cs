@@ -11,7 +11,7 @@ namespace News.Services;
 /// absolute. A piece that leaves the page it came from has nothing left to resolve a relative
 /// source or link against.
 /// </summary>
-internal static class HtmlAddresses
+public static class HtmlAddresses
 {
     /// <summary>
     /// Writes HTML back out with its letters as they are. The default encoder turns everything

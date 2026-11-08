@@ -40,7 +40,7 @@ public abstract class FeedClient(HttpClient httpClient, ILogger logger)
     /// The document's root, provided it is the one the format names; a feed of some other format
     /// would otherwise parse to nothing rather than fail.
     /// </summary>
-    private protected static XElement ReadRoot(XDocument document, string localName, string format)
+    protected static XElement ReadRoot(XDocument document, string localName, string format)
     {
         var root = document.Root ?? throw new FormatException("The feed is missing a root element.");
 
@@ -49,7 +49,7 @@ public abstract class FeedClient(HttpClient httpClient, ILogger logger)
             : throw new FormatException($"Not an {format} feed: the root element is <{root.Name.LocalName}>.");
     }
 
-    private protected static string? ReadImageUrl(XElement item)
+    protected static string? ReadImageUrl(XElement item)
     {
         var enclosure = item
             .Elements()
@@ -93,13 +93,13 @@ public abstract class FeedClient(HttpClient httpClient, ILogger logger)
         return true;
     }
 
-    private protected static string? ReadMediaContentUrl(XElement item)
+    protected static string? ReadMediaContentUrl(XElement item)
     {
         var url = (string?)MediaElements(item, "content").FirstOrDefault()?.Attribute("url");
         return string.IsNullOrWhiteSpace(url) ? null : url.Trim();
     }
 
-    private protected static long? ReadViews(XElement item)
+    protected static long? ReadViews(XElement item)
     {
         var views = (string?)MediaElements(item, "statistics").FirstOrDefault()?.Attribute("views");
         return long.TryParse(views, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) && parsed >= 0
@@ -107,7 +107,7 @@ public abstract class FeedClient(HttpClient httpClient, ILogger logger)
             : null;
     }
 
-    private protected static string? ReadMediaValue(XElement parent, string localName)
+    protected static string? ReadMediaValue(XElement parent, string localName)
     {
         var value = MediaElements(parent, localName).FirstOrDefault()?.Value;
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
@@ -116,15 +116,15 @@ public abstract class FeedClient(HttpClient httpClient, ILogger logger)
     /// <summary>
     /// Media RSS elements anywhere under the item, since they are commonly wrapped in a media:group.
     /// </summary>
-    private protected static IEnumerable<XElement> MediaElements(XElement item, string localName) =>
+    protected static IEnumerable<XElement> MediaElements(XElement item, string localName) =>
         item.Descendants().Where(element =>
             element.Name.LocalName == localName &&
             element.Name.NamespaceName == MediaNamespace);
 
-    private protected static DateTimeOffset ReadDate(string? rawDate) =>
+    protected static DateTimeOffset ReadDate(string? rawDate) =>
         DateTimeOffset.TryParse(rawDate, out var parsed) ? parsed : DateTimeOffset.UtcNow;
 
-    private protected static string? ReadElementValue(XElement parent, string localName, string? fallback)
+    protected static string? ReadElementValue(XElement parent, string localName, string? fallback)
     {
         var value = parent.Elements().FirstOrDefault(element => element.Name.LocalName == localName)?.Value;
         return string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();

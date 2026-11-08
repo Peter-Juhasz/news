@@ -11,7 +11,7 @@ namespace News.Services;
 /// A selector the parser cannot read is turned away when the groups file is read rather than when
 /// a page is.
 /// </remarks>
-internal static class HtmlSelector
+public static class HtmlSelector
 {
     private static readonly HtmlDocument EmptyDocument = HtmlDocument.Parse(string.Empty);
 

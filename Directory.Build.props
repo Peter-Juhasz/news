@@ -1,5 +1,7 @@
-﻿<Project>
+<Project>
 	<PropertyGroup>
+		<Nullable>enable</Nullable>
+		<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
 		<EnableNETAnalyzers>true</EnableNETAnalyzers>
 		<AccelerateBuildsInVisualStudio>true</AccelerateBuildsInVisualStudio>
 		<MSTestAnalysisMode>Recommended</MSTestAnalysisMode>

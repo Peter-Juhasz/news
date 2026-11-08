@@ -113,6 +113,13 @@ public partial class App : Application
         builder.Services.AddTransient<XAuthenticationHandler>();
         AddFeedClient(builder.Services.AddHttpClient<IXClient, XClient>().AddHttpMessageHandler<XAuthenticationHandler>());
 
+        // the providers the news source client hands each source to, one per provider library
+        builder.Services.AddSingleton<INewsSourceProvider, RssNewsSourceProvider>();
+        builder.Services.AddSingleton<INewsSourceProvider, AtomNewsSourceProvider>();
+        builder.Services.AddSingleton<INewsSourceProvider, GitHubNewsSourceProvider>();
+        builder.Services.AddSingleton<INewsSourceProvider, HtmlNewsSourceProvider>();
+        builder.Services.AddSingleton<INewsSourceProvider, XNewsSourceProvider>();
+
         // Article pages are heavier than a feed and are fetched while the reader waits, so this
         // one gives an attempt longer to finish and retries it fewer times.
         builder.Services

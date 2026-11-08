@@ -60,7 +60,7 @@ public sealed partial class XClient(HttpClient httpClient, ILogger<XClient> logg
 
     /// <summary>
     /// Accounts by handle. An account keeps its ID for good, so it is looked up once for as long as
-    /// the client lives — the app's run, held as it is by the news source client — rather than on
+    /// the client lives — the app's run, held as it is by the X news source provider — rather than on
     /// every load, each of which X would charge for.
     /// </summary>
     private readonly ConcurrentDictionary<string, User> _users = new(StringComparer.OrdinalIgnoreCase);

@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
@@ -6,12 +6,10 @@
     <SupportedOSPlatformVersion>10.0.26100.0</SupportedOSPlatformVersion>
     <RootNamespace>News.Client.WinUI3</RootNamespace>
     <UseWinUI>true</UseWinUI>
-    <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>news</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
-    <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
     
     <!-- Unpackaged (no MSIX): the app carries its own copy of the Windows App SDK runtime,
          so it runs on a machine where that runtime was never installed. -->
@@ -48,6 +46,11 @@
   <ItemGroup>
     <ProjectReference Include="..\News.Domain\News.Domain.csproj" />
     <ProjectReference Include="..\News.Services\News.Services.csproj" />
+    <ProjectReference Include="..\News.Services.Atom\News.Services.Atom.csproj" />
+    <ProjectReference Include="..\News.Services.GitHub\News.Services.GitHub.csproj" />
+    <ProjectReference Include="..\News.Services.Html\News.Services.Html.csproj" />
+    <ProjectReference Include="..\News.Services.Rss\News.Services.Rss.csproj" />
+    <ProjectReference Include="..\News.Services.X\News.Services.X.csproj" />
   </ItemGroup>
 
     <!-- Every compiled XAML page is indexed into Acc.pri rather than written beside the exe, and the

@@ -2,30 +2,17 @@ using News.Domain;
 
 namespace News.Services;
 
-public sealed class NewsSourceClient(
-    IRssFeedClient rssFeedClient,
-    IAtomFeedClient atomFeedClient,
-    IGitHubIssueClient gitHubIssueClient,
-    IHtmlPageClient htmlPageClient,
-    IXClient xClient)
-    : INewsSourceClient
+/// <summary>
+/// Hands a source to the first registered provider that reads its kind.
+/// </summary>
+public sealed class NewsSourceClient(IEnumerable<INewsSourceProvider> providers) : INewsSourceClient
 {
+    private readonly INewsSourceProvider[] _providers = [.. providers];
+
     public Task<IReadOnlyList<NewsItem>> LoadAsync(NewsSource source, CancellationToken cancellationToken) =>
-        source switch
+        Array.Find(_providers, provider => provider.CanLoad(source)) switch
         {
-            RssNewsSource rss => rssFeedClient.LoadAsync(rss.Url, cancellationToken),
-            AtomNewsSource atom => atomFeedClient.LoadAsync(atom.Url, cancellationToken),
-            // Reddit and YouTube publish Atom only, whatever their feed URLs suggest.
-            RedditNewsSource reddit => atomFeedClient.LoadAsync(reddit.FeedUrl, cancellationToken),
-            YouTubeNewsSource youTube => atomFeedClient.LoadAsync(youTube.FeedUrl, cancellationToken),
-            GitHubNewsSource { FeedUrl: { } feedUrl } => atomFeedClient.LoadAsync(feedUrl, cancellationToken),
-            GitHubNewsSource { Feed: GitHubFeed.Issues } gitHub =>
-                gitHubIssueClient.LoadIssuesAsync(gitHub.Repository, cancellationToken),
-            GitHubNewsSource { Feed: GitHubFeed.Pulls } gitHub =>
-                gitHubIssueClient.LoadPullRequestsAsync(gitHub.Repository, cancellationToken),
-            HtmlNewsSource html => htmlPageClient.LoadAsync(html, cancellationToken),
-            XNewsSource x => xClient.LoadUserPostsAsync(x.Username, cancellationToken),
-            XSearchNewsSource xSearch => xClient.SearchAsync(xSearch.Query, cancellationToken),
-            _ => throw new NotSupportedException($"Unsupported source type: {source.GetType().Name}.")
+            { } provider => provider.LoadAsync(source, cancellationToken),
+            null => throw new NotSupportedException($"Unsupported source type: {source.GetType().Name}.")
         };
 }

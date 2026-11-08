@@ -1,11 +1,7 @@
-using System.Buffers;
 using System.Globalization;
-using System.Text.Encodings.Web;
-using System.Text.Unicode;
 using Microsoft.Extensions.Logging;
 using News.Domain;
 using PeterJuhasz.Text.Html.Model;
-using PeterJuhasz.Text.Html.Writer;
 
 namespace News.Services;
 
@@ -16,13 +12,6 @@ namespace News.Services;
 /// </summary>
 public sealed class HtmlPageClient(HttpClient httpClient, ILogger<HtmlPageClient> logger) : IHtmlPageClient
 {
-    /// <summary>
-    /// Writes a teaser back out with its letters as they are. The default encoder turns everything
-    /// outside Basic Latin into a character reference, which is every accented letter of a page
-    /// not written in English.
-    /// </summary>
-    private static readonly HtmlEncoder Encoder = HtmlEncoder.Create(UnicodeRanges.All);
-
     public async Task<IReadOnlyList<NewsItem>> LoadAsync(HtmlNewsSource source, CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, source.Url);
@@ -40,7 +29,7 @@ public sealed class HtmlPageClient(HttpClient httpClient, ILogger<HtmlPageClient
 
         // A redirect moves the page, and the addresses inside it resolve against wherever it landed.
         var page = new Page(
-            BaseUri: ResolveBaseUri(document, response.RequestMessage?.RequestUri ?? new Uri(source.Url)),
+            BaseUri: HtmlAddresses.ResolveBaseUri(document, response.RequestMessage?.RequestUri ?? new Uri(source.Url)),
             Culture: ReadCulture(document),
             LoadedAt: DateTimeOffset.UtcNow);
 
@@ -78,7 +67,7 @@ public sealed class HtmlPageClient(HttpClient httpClient, ILogger<HtmlPageClient
             return null;
         }
 
-        var content = leadElement is null ? string.Empty : WriteWithAbsoluteAddresses(leadElement, page.BaseUri);
+        var content = leadElement is null ? string.Empty : HtmlAddresses.WriteWithAbsoluteAddresses(leadElement, page.BaseUri);
 
         return new NewsItem(
             Id: url,
@@ -104,7 +93,7 @@ public sealed class HtmlPageClient(HttpClient httpClient, ILogger<HtmlPageClient
     private static string? ReadLink(HtmlElement element, Uri baseUri) =>
         element.Descendants("a")
             .Prepend(element)
-            .Select(candidate => ResolveAddress(candidate.GetAttribute("href")?.Value, baseUri))
+            .Select(candidate => HtmlAddresses.ResolveAddress(candidate.GetAttribute("href")?.Value, baseUri))
             .FirstOrDefault(address => address is not null);
 
     /// <summary>
@@ -115,8 +104,8 @@ public sealed class HtmlPageClient(HttpClient httpClient, ILogger<HtmlPageClient
     private static string? ReadImageUrl(HtmlElement item, Uri baseUri) =>
         item.Descendants("img")
             .Select(image =>
-                ResolveAddress(image.GetAttribute("src")?.Value, baseUri) ??
-                ResolveAddress(image.GetAttribute("data-src")?.Value, baseUri))
+                HtmlAddresses.ResolveAddress(image.GetAttribute("src")?.Value, baseUri) ??
+                HtmlAddresses.ResolveAddress(image.GetAttribute("data-src")?.Value, baseUri))
             .FirstOrDefault(address => address is not null);
 
     /// <summary>
@@ -170,60 +159,6 @@ public sealed class HtmlPageClient(HttpClient httpClient, ILogger<HtmlPageClient
         catch (CultureNotFoundException)
         {
             return null;
-        }
-    }
-
-    /// <summary>
-    /// The address relative links resolve against: the page's own, unless it declares another
-    /// with a &lt;base&gt; element.
-    /// </summary>
-    private static Uri ResolveBaseUri(HtmlDocument document, Uri requestUri)
-    {
-        var declared = document.GetElementsByTagName("base")
-            .Select(element => element.GetAttribute("href")?.Value)
-            .FirstOrDefault(href => href is not null);
-
-        return Uri.TryCreate(requestUri, declared, out var baseUri) ? baseUri : requestUri;
-    }
-
-    /// <summary>
-    /// An address made absolute against the page. Anything that does not lead to a web address —
-    /// a script, a mail link, a picture carried inside the page — is no link to open and no picture
-    /// to fetch.
-    /// </summary>
-    private static string? ResolveAddress(string? value, Uri baseUri) =>
-        !string.IsNullOrWhiteSpace(value) &&
-        Uri.TryCreate(baseUri, value.Trim(), out var address) &&
-        address.Scheme is "http" or "https"
-            ? address.AbsoluteUri
-            : null;
-
-    private static string WriteWithAbsoluteAddresses(HtmlElement element, Uri baseUri)
-    {
-        var buffer = new ArrayBufferWriter<char>();
-        new AbsoluteAddressWriter(HtmlWriter.Create(buffer, Encoder), baseUri).VisitElement(element);
-        return buffer.WrittenSpan.ToString();
-    }
-
-    /// <summary>
-    /// Writes an element back out with the addresses in it made absolute. The teaser leaves the
-    /// page it came from, so a relative source or link would have nothing left to resolve against.
-    /// </summary>
-    private sealed class AbsoluteAddressWriter(HtmlWriter<ArrayBufferWriter<char>> writer, Uri baseUri)
-        : HtmlWriterVisitor<ArrayBufferWriter<char>>(writer)
-    {
-        public override void VisitAttribute(HtmlAttribute attribute)
-        {
-            // anything that does not resolve to a web address — a data URI, a mailto link — is
-            // written as it stands, since making it absolute would say nothing more than it does
-            if (attribute.Name.ToLowerInvariant() is "href" or "src" &&
-                ResolveAddress(attribute.Value, baseUri) is { } address)
-            {
-                Writer.WriteAttribute(attribute.Name, address);
-                return;
-            }
-
-            base.VisitAttribute(attribute);
         }
     }
 

@@ -10,18 +10,8 @@ namespace News.Storage;
 /// <summary>
 /// Stores every bookmark in the one file configuration names.
 /// </summary>
-public sealed class BookmarkStore : IBookmarkStore
+public sealed partial class BookmarkStore : IBookmarkStore
 {
-    /// <summary>
-    /// Indented, and with the fields a story leaves unset left out rather than spelled out as
-    /// nulls: this file is the reader's own, and is meant to be legible if they open it.
-    /// </summary>
-    private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web)
-    {
-        WriteIndented = true,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-    };
-
     private readonly ILogger<BookmarkStore> _logger;
     private readonly string _filePath;
 
@@ -41,7 +31,7 @@ public sealed class BookmarkStore : IBookmarkStore
         try
         {
             await using var stream = File.OpenRead(_filePath);
-            return await JsonSerializer.DeserializeAsync<BookmarkCollection>(stream, SerializerOptions, cancellationToken);
+            return await JsonSerializer.DeserializeAsync(stream, BookmarkStoreJsonContext.Default.BookmarkCollection, cancellationToken);
         }
         catch (IOException exception)
         {
@@ -76,7 +66,7 @@ public sealed class BookmarkStore : IBookmarkStore
 
             await using (var stream = File.Create(temporaryPath))
             {
-                await JsonSerializer.SerializeAsync(stream, bookmarks, SerializerOptions, cancellationToken);
+                await JsonSerializer.SerializeAsync(stream, bookmarks, BookmarkStoreJsonContext.Default.BookmarkCollection, cancellationToken);
             }
 
             File.Move(temporaryPath, _filePath, overwrite: true);
@@ -134,4 +124,17 @@ public sealed class BookmarkStore : IBookmarkStore
             _logger.LogWarning(exception, "Not allowed to delete the temporary file '{File}'.", temporaryPath);
         }
     }
+
+    /// <summary>
+    /// Indented, and with the fields a story leaves unset left out rather than spelled out as
+    /// nulls: this file is the reader's own, and is meant to be legible if they open it. Generated
+    /// at build time rather than reflected over at run time, which a natively compiled app has
+    /// nothing to reflect with.
+    /// </summary>
+    [JsonSourceGenerationOptions(
+        JsonSerializerDefaults.Web,
+        WriteIndented = true,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonSerializable(typeof(BookmarkCollection))]
+    private sealed partial class BookmarkStoreJsonContext : JsonSerializerContext;
 }

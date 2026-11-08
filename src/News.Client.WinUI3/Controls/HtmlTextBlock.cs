@@ -9,7 +9,7 @@ namespace News.Client.WinUI3.Controls;
 /// structure is rebuilt inside a <see cref="RichTextBlock"/>, so feed content renders with the
 /// app's fonts and theme instead of a web view.
 /// </summary>
-public sealed class HtmlTextBlock : UserControl
+public sealed partial class HtmlTextBlock : UserControl
 {
     public static readonly DependencyProperty HtmlProperty = DependencyProperty.Register(
         nameof(Html),

@@ -23,6 +23,16 @@
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
     <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' And '$(Platform)' == 'ARM64'">win-arm64</RuntimeIdentifier>
     <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-x64</RuntimeIdentifier>
+
+    <!-- A native AOT publish otherwise takes the SDK's shortened path, which compiles the XAML
+         before the references are resolved: the XAML compiler then finds no WinUI types to compile
+         against and fails with WMC1007. -->
+    <UseOptimizedPublish>false</UseOptimizedPublish>
+
+    <!-- CsWinRT writes the WinRT interfaces of the generic collections handed to WinUI — the day
+         groups, the group list — in unsafe code, and without leave to do so it quietly writes none:
+         a natively compiled app then has nothing to hand over, and the list turns them away. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>

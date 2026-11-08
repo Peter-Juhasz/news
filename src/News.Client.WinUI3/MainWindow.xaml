@@ -181,12 +181,12 @@
                                 <ListView.GroupStyle>
                                     <GroupStyle>
                                         <GroupStyle.HeaderTemplate>
-                                            <DataTemplate>
+                                            <DataTemplate x:DataType="vm:NewsDayGroupViewModel">
                                                 <TextBlock
                                                     Margin="0,12,0,4"
                                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                                     Style="{StaticResource BodyStrongTextBlockStyle}"
-                                                    Text="{Binding DayLabel}" />
+                                                    Text="{x:Bind DayLabel}" />
                                             </DataTemplate>
                                         </GroupStyle.HeaderTemplate>
                                     </GroupStyle>

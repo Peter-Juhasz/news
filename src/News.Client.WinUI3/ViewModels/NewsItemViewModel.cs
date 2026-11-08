@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using News.Domain;
 using News.Services;
+using WinRT;
 
 namespace News.Client.WinUI3.ViewModels;
 
@@ -10,7 +11,13 @@ namespace News.Client.WinUI3.ViewModels;
 /// for the same story — which is what lets the list be updated where it changed instead of
 /// being rebuilt.
 /// </summary>
-public sealed class NewsItemViewModel : ObservableObject
+/// <remarks>
+/// The row's picture is bound by name rather than compiled in (see the list's item template), so
+/// the properties a binding can find are generated here at build time: a natively compiled app has
+/// no reflection to look them up with.
+/// </remarks>
+[GeneratedBindableCustomProperty]
+public sealed partial class NewsItemViewModel : ObservableObject
 {
     /// <summary>Separates the parts of a metadata line, both here and in the reading pane's byline.</summary>
     public const string Separator = " · ";

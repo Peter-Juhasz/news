@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Options;
 using News.Configuration;
 
@@ -20,14 +21,9 @@ namespace News.Services;
 /// through the handler's own pipeline so it is given the same patience with a failing server as
 /// the request it is made for.
 /// </remarks>
-public sealed class XAuthenticationHandler(XAccessTokenCache cache, IOptions<XOptions> options) : DelegatingHandler
+public sealed partial class XAuthenticationHandler(XAccessTokenCache cache, IOptions<XOptions> options) : DelegatingHandler
 {
     private const string TokenUrl = "https://api.x.com/oauth2/token";
-
-    private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web)
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
-    };
 
     protected override async Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request,
@@ -79,7 +75,7 @@ public sealed class XAuthenticationHandler(XAccessTokenCache cache, IOptions<XOp
         using var response = await base.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
 
-        var token = await response.Content.ReadFromJsonAsync<TokenResponse>(SerializerOptions, cancellationToken);
+        var token = await response.Content.ReadFromJsonAsync(XAuthenticationJsonContext.Default.TokenResponse, cancellationToken);
 
         return token is { AccessToken: { Length: > 0 } accessToken } &&
                string.Equals(token.TokenType, "bearer", StringComparison.OrdinalIgnoreCase)
@@ -88,4 +84,12 @@ public sealed class XAuthenticationHandler(XAccessTokenCache cache, IOptions<XOp
     }
 
     private sealed record TokenResponse(string? TokenType, string? AccessToken);
+
+    /// <summary>
+    /// Generated at build time rather than reflected over at run time, which a natively compiled
+    /// app has nothing to reflect with.
+    /// </summary>
+    [JsonSourceGenerationOptions(JsonSerializerDefaults.Web, PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower)]
+    [JsonSerializable(typeof(TokenResponse))]
+    private sealed partial class XAuthenticationJsonContext : JsonSerializerContext;
 }

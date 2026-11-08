@@ -3,6 +3,8 @@ using System.Net;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using System.Text.RegularExpressions;
 using System.Text.Unicode;
 using Microsoft.Extensions.Logging;
@@ -50,11 +52,6 @@ public sealed partial class XClient(HttpClient httpClient, ILogger<XClient> logg
     /// </summary>
     private const string UserFields = "user.fields=profile_image_url";
 
-    private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web)
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
-    };
-
     /// <summary>
     /// Writes the text back out with its letters as they are, rather than turning everything
     /// outside Basic Latin into a character reference.
@@ -77,7 +74,7 @@ public sealed partial class XClient(HttpClient httpClient, ILogger<XClient> logg
         var url = $"{ApiUrl}/users/{user.Id}/tweets?max_results={PageSize}&exclude=replies,retweets" +
                   $"&{PostFields}&expansions=attachments.media_keys&{MediaFields}";
 
-        var page = await GetAsync<Page>(url, cancellationToken);
+        var page = await GetAsync(url, XJsonContext.Default.Page, cancellationToken);
         var items = ToNewsItems(page, _ => user, showsAuthor: false);
 
         logger.LogDebug("Loaded {Count} items from {Url}", items.Count, url);
@@ -89,7 +86,7 @@ public sealed partial class XClient(HttpClient httpClient, ILogger<XClient> logg
         var url = $"{ApiUrl}/tweets/search/all?query={Uri.EscapeDataString(query)}&sort_order=recency&max_results={PageSize}" +
                   $"&{PostFields}&expansions=author_id,attachments.media_keys&{MediaFields}&{UserFields}";
 
-        var page = await GetAsync<Page>(url, cancellationToken);
+        var page = await GetAsync(url, XJsonContext.Default.Page, cancellationToken);
 
         var authors = new Dictionary<string, User>(StringComparer.Ordinal);
         foreach (var user in page.Includes?.Users ?? [])
@@ -113,8 +110,9 @@ public sealed partial class XClient(HttpClient httpClient, ILogger<XClient> logg
             return user;
         }
 
-        var result = await GetAsync<UserResult>(
+        var result = await GetAsync(
             $"{ApiUrl}/users/by/username/{Uri.EscapeDataString(username)}?{UserFields}",
+            XJsonContext.Default.UserResult,
             cancellationToken);
 
         // An account that is not there, or is suspended, is answered with an error in place of it.
@@ -124,7 +122,7 @@ public sealed partial class XClient(HttpClient httpClient, ILogger<XClient> logg
         return _users[username] = user;
     }
 
-    private async Task<T> GetAsync<T>(string url, CancellationToken cancellationToken)
+    private async Task<T> GetAsync<T>(string url, JsonTypeInfo<T> typeInfo, CancellationToken cancellationToken)
     {
         using var response = await httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
 
@@ -140,7 +138,7 @@ public sealed partial class XClient(HttpClient httpClient, ILogger<XClient> logg
                 response.StatusCode);
         }
 
-        return await JsonSerializer.DeserializeAsync<T>(stream, SerializerOptions, cancellationToken)
+        return await JsonSerializer.DeserializeAsync(stream, typeInfo, cancellationToken)
             ?? throw new FormatException($"X returned nothing from {url}.");
     }
 
@@ -148,7 +146,7 @@ public sealed partial class XClient(HttpClient httpClient, ILogger<XClient> logg
     {
         try
         {
-            var problem = await JsonSerializer.DeserializeAsync<Problem>(stream, SerializerOptions, cancellationToken);
+            var problem = await JsonSerializer.DeserializeAsync(stream, XJsonContext.Default.Problem, cancellationToken);
             return problem?.Detail ?? problem?.Title ?? "no reason given.";
         }
         catch (JsonException)
@@ -382,4 +380,14 @@ public sealed partial class XClient(HttpClient httpClient, ILogger<XClient> logg
     /// of what was asked for.
     /// </summary>
     private sealed record Problem(string? Title, string? Detail);
+
+    /// <summary>
+    /// Generated at build time rather than reflected over at run time, which a natively compiled
+    /// app has nothing to reflect with.
+    /// </summary>
+    [JsonSourceGenerationOptions(JsonSerializerDefaults.Web, PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower)]
+    [JsonSerializable(typeof(Page))]
+    [JsonSerializable(typeof(UserResult))]
+    [JsonSerializable(typeof(Problem))]
+    private sealed partial class XJsonContext : JsonSerializerContext;
 }

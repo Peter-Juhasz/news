@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using News.Configuration;
@@ -11,7 +12,7 @@ namespace News.Storage;
 /// Stores each group's items in a JSON file of its own, so a group written while another one is
 /// still loading leaves that one's file alone.
 /// </summary>
-public sealed class NewsItemStore : INewsItemStore
+public sealed partial class NewsItemStore : INewsItemStore
 {
     private const string FileExtension = ".json";
 
@@ -20,8 +21,6 @@ public sealed class NewsItemStore : INewsItemStore
     /// group title spelled out in full.
     /// </summary>
     private const int MaximumSlugLength = 32;
-
-    private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
 
     private readonly ILogger<NewsItemStore> _logger;
     private readonly string _directoryPath;
@@ -44,7 +43,7 @@ public sealed class NewsItemStore : INewsItemStore
         try
         {
             await using var stream = File.OpenRead(filePath);
-            return await JsonSerializer.DeserializeAsync<NewsGroupSnapshot>(stream, SerializerOptions, cancellationToken);
+            return await JsonSerializer.DeserializeAsync(stream, NewsItemStoreJsonContext.Default.NewsGroupSnapshot, cancellationToken);
         }
         catch (IOException exception)
         {
@@ -78,7 +77,7 @@ public sealed class NewsItemStore : INewsItemStore
 
             await using (var stream = File.Create(temporaryPath))
             {
-                await JsonSerializer.SerializeAsync(stream, snapshot, SerializerOptions, cancellationToken);
+                await JsonSerializer.SerializeAsync(stream, snapshot, NewsItemStoreJsonContext.Default.NewsGroupSnapshot, cancellationToken);
             }
 
             File.Move(temporaryPath, filePath, overwrite: true);
@@ -156,4 +155,12 @@ public sealed class NewsItemStore : INewsItemStore
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(title));
         return Convert.ToHexStringLower(hash.AsSpan(0, 4));
     }
+
+    /// <summary>
+    /// Serialization code generated at build time rather than reflected over at run time, which a
+    /// natively compiled app has nothing to reflect with.
+    /// </summary>
+    [JsonSourceGenerationOptions(JsonSerializerDefaults.Web)]
+    [JsonSerializable(typeof(NewsGroupSnapshot))]
+    private sealed partial class NewsItemStoreJsonContext : JsonSerializerContext;
 }

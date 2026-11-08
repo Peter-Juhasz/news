@@ -16,18 +16,13 @@ namespace News.Services;
 /// the bodies already rendered to HTML. What is left of a page once the other kind is filtered out
 /// is the kind asked for, opened over the same stretch of time.
 /// </remarks>
-public sealed class GitHubIssueClient(HttpClient httpClient, ILogger<GitHubIssueClient> logger) : IGitHubIssueClient
+public sealed partial class GitHubIssueClient(HttpClient httpClient, ILogger<GitHubIssueClient> logger) : IGitHubIssueClient
 {
     /// <summary>
     /// Enough to cover a busy repository's day. Bodies are the bulk of a page, and a busy
     /// repository's run to hundreds of kilobytes for this many.
     /// </summary>
     private const int PageSize = 50;
-
-    private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web)
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
-    };
 
     public Task<IReadOnlyList<NewsItem>> LoadIssuesAsync(string repository, CancellationToken cancellationToken) =>
         LoadAsync(repository, pullRequests: false, cancellationToken);
@@ -56,7 +51,7 @@ public sealed class GitHubIssueClient(HttpClient httpClient, ILogger<GitHubIssue
         response.EnsureSuccessStatusCode();
 
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-        var issues = await JsonSerializer.DeserializeAsync<List<Issue>>(stream, SerializerOptions, cancellationToken)
+        var issues = await JsonSerializer.DeserializeAsync(stream, GitHubJsonContext.Default.ListIssue, cancellationToken)
             ?? throw new FormatException("GitHub returned no issue list.");
 
         var items = issues
@@ -124,4 +119,12 @@ public sealed class GitHubIssueClient(HttpClient httpClient, ILogger<GitHubIssue
     /// Present on the pull requests the issues endpoint returns, and only on them.
     /// </summary>
     private sealed class PullRequestLinks;
+
+    /// <summary>
+    /// Generated at build time rather than reflected over at run time, which a natively compiled
+    /// app has nothing to reflect with.
+    /// </summary>
+    [JsonSourceGenerationOptions(JsonSerializerDefaults.Web, PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower)]
+    [JsonSerializable(typeof(List<Issue>))]
+    private sealed partial class GitHubJsonContext : JsonSerializerContext;
 }

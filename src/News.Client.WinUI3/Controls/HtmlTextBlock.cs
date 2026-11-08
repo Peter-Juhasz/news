@@ -73,7 +73,8 @@ public sealed partial class HtmlTextBlock : UserControl
 
     /// <summary>
     /// Feed content decides where its links point, so the address is shown for approval before the
-    /// browser is opened.
+    /// browser is opened. The address is checked again against <see cref="LinkSafety"/> here, so
+    /// one that should never have become a link is shown but cannot be opened.
     /// </summary>
     private async void OnLinkActivated(Uri uri)
     {
@@ -86,22 +87,31 @@ public sealed partial class HtmlTextBlock : UserControl
 
         try
         {
+            var isSafe = LinkSafety.IsSafe(uri);
+            var description = isSafe ? uri.ToString() : uri.OriginalString;
+
             var dialog = new ContentDialog
             {
                 XamlRoot = XamlRoot,
-                Title = "Open this link?",
+                Title = isSafe ? "Open this link?" : "This link can't be opened",
                 Content = new TextBlock
                 {
-                    Text = uri.ToString(),
+                    Text = isSafe
+                        ? description
+                        : $"{description}\n\nOnly https links to other computers, written without special characters, can be opened.",
                     TextWrapping = TextWrapping.Wrap,
                     IsTextSelectionEnabled = true
                 },
-                PrimaryButtonText = "Open",
-                CloseButtonText = "Cancel",
+                CloseButtonText = isSafe ? "Cancel" : "Close",
                 DefaultButton = ContentDialogButton.Close
             };
 
-            if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+            if (isSafe)
+            {
+                dialog.PrimaryButtonText = "Open";
+            }
+
+            if (await dialog.ShowAsync() is ContentDialogResult.Primary && isSafe)
             {
                 await Launcher.LaunchUriAsync(uri);
             }

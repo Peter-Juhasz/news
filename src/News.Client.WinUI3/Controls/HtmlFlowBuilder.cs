@@ -737,13 +737,11 @@ internal sealed partial class HtmlFlowBuilder : HtmlVisitor
     }
 
     /// <summary>
-    /// Only https addresses become links: feed content is untrusted, so file, javascript, data and
-    /// every other scheme is left as plain text rather than handed to the shell.
+    /// Only safe https addresses become links: feed content is untrusted, so file, javascript, data
+    /// and every other scheme, as well as non-ASCII and loopback addresses, are left as plain text
+    /// rather than handed to the shell. See <see cref="LinkSafety"/>.
     /// </summary>
-    private static Uri? ResolveLink(string? href) =>
-        Uri.TryCreate(href, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps
-            ? uri
-            : null;
+    private static Uri? ResolveLink(string? href) => LinkSafety.TryCreate(href?.Trim());
 
     private InlineCollection GetInlines(TextFormat format)
     {

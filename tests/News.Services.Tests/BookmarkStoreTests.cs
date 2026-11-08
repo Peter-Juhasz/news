@@ -1,8 +1,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
-using News.Configuration;
 using News.Domain;
 using News.Storage;
+using PeterJuhasz.Repositories.FileSystem;
 
 namespace News.Services.Tests;
 
@@ -156,7 +155,7 @@ public sealed class BookmarkStoreTests
 
         var json = await File.ReadAllTextAsync(_filePath, TestContext.CancellationToken);
 
-        Assert.Contains("\"type\": \"rss\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"type\":\"rss\"", json, StringComparison.Ordinal);
     }
 
     [TestMethod]
@@ -208,6 +207,7 @@ public sealed class BookmarkStoreTests
 
     private BookmarkStore CreateStore() =>
         new(
-            Options.Create(new NewsReaderOptions { BookmarksFilePath = _filePath }),
+            new DirectoryInfo(_directoryPath).GetPartition(),
+            Path.GetFileName(_filePath),
             NullLogger<BookmarkStore>.Instance);
 }

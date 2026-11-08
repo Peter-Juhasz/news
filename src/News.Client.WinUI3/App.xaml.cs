@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
@@ -12,6 +13,7 @@ using News.Configuration;
 using News.Groups;
 using News.Services;
 using News.Storage;
+using PeterJuhasz.Repositories.FileSystem;
 
 namespace News.Client.WinUI3;
 
@@ -90,7 +92,14 @@ public partial class App : Application
         builder.Services.AddSingleton<IGroupCatalog, GroupCatalog>();
         builder.Services.AddSingleton<INewsSourceClient, NewsSourceClient>();
         builder.Services.AddSingleton<INewsItemStore, NewsItemStore>();
-        builder.Services.AddSingleton<IBookmarkStore, BookmarkStore>();
+        builder.Services.AddSingleton<IBookmarkStore>(static provider =>
+        {
+            var file = new FileInfo(ConfiguredPath.Resolve(provider.GetRequiredService<IOptions<NewsReaderOptions>>().Value.BookmarksFilePath));
+            return new BookmarkStore(
+                file.Directory!.GetPartition(),
+                file.Name,
+                provider.GetRequiredService<ILogger<BookmarkStore>>());
+        });
         builder.Services.AddSingleton<IBookmarkService, BookmarkService>();
 
         AddFeedClient(builder.Services.AddHttpClient<IRssFeedClient, RssFeedClient>());

@@ -2,53 +2,54 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using News.Configuration;
+using PeterJuhasz.Repositories.Abstractions;
+using PeterJuhasz.Repositories.Blobs;
+using PeterJuhasz.Repositories.Locking;
 
 namespace News.Storage;
 
 /// <summary>
-/// Stores every bookmark in the one file configuration names.
+/// Stores every bookmark in one blob of the partition it is given.
 /// </summary>
 public sealed partial class BookmarkStore : IBookmarkStore
 {
+    private readonly IBlobPartition _partition;
+    private readonly string _name;
+    private readonly IObjectRepository<BookmarkCollection> _repository;
     private readonly ILogger<BookmarkStore> _logger;
-    private readonly string _filePath;
 
-    public BookmarkStore(IOptions<NewsReaderOptions> options, ILogger<BookmarkStore> logger)
+    public BookmarkStore(IBlobPartition partition, string name, ILogger<BookmarkStore> logger)
     {
+        _partition = partition;
+        _name = name;
         _logger = logger;
-        _filePath = ConfiguredPath.Resolve(options.Value.BookmarksFilePath);
+        _repository = partition.GetBlob(name)
+            .WithLocking()
+            .AsJsonObjectRepository(BookmarkStoreJsonContext.Default.BookmarkCollection);
     }
 
     public async Task<BookmarkCollection?> LoadAsync(CancellationToken cancellationToken)
     {
-        if (!File.Exists(_filePath))
-        {
-            return null;
-        }
-
         try
         {
-            await using var stream = File.OpenRead(_filePath);
-            return await JsonSerializer.DeserializeAsync(stream, BookmarkStoreJsonContext.Default.BookmarkCollection, cancellationToken);
+            return await _repository.GetOrDefaultAsync(cancellationToken);
         }
         catch (IOException exception)
         {
-            _logger.LogWarning(exception, "Failed to read the bookmarks file '{File}'.", _filePath);
+            _logger.LogWarning(exception, "Failed to read the bookmarks '{Name}'.", _name);
         }
         catch (UnauthorizedAccessException exception)
         {
-            _logger.LogWarning(exception, "Not allowed to read the bookmarks file '{File}'.", _filePath);
+            _logger.LogWarning(exception, "Not allowed to read the bookmarks '{Name}'.", _name);
         }
         catch (JsonException exception)
         {
             // Unlike the items a group caches, bookmarks are not something a later load brings
-            // back: whatever cannot be read here is the only copy of it. So the file is set aside
-            // under a name of its own rather than left to be written over, and can still be
-            // repaired by hand.
-            _logger.LogWarning(exception, "Setting aside the unreadable bookmarks file '{File}'.", _filePath);
-            TrySetAsideUnreadableFile();
+            // back: whatever cannot be read here is the only copy of it. So it is set aside under
+            // a name of its own rather than left to be written over, and can still be repaired
+            // by hand.
+            _logger.LogWarning(exception, "Setting aside the unreadable bookmarks '{Name}'.", _name);
+            await TrySetAsideUnreadableAsync(cancellationToken);
         }
 
         return null;
@@ -56,84 +57,70 @@ public sealed partial class BookmarkStore : IBookmarkStore
 
     public async Task SaveAsync(BookmarkCollection bookmarks, CancellationToken cancellationToken)
     {
-        // Written beside the file and moved onto it, so a save that does not finish leaves the
-        // previous bookmarks readable rather than a truncated file in their place.
-        var temporaryPath = _filePath + ".tmp";
-
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
-
-            await using (var stream = File.Create(temporaryPath))
-            {
-                await JsonSerializer.SerializeAsync(stream, bookmarks, BookmarkStoreJsonContext.Default.BookmarkCollection, cancellationToken);
-            }
-
-            File.Move(temporaryPath, _filePath, overwrite: true);
+            // written unconditionally rather than read, changed and written back: whatever is
+            // stored is replaced whole, even when it could not be read.
+            await _repository.StoreAsync(bookmarks, IBlob.AnyOrNoneConcurrencyToken, cancellationToken);
         }
         catch (IOException exception)
         {
-            _logger.LogWarning(exception, "Failed to store the bookmarks in '{File}'.", _filePath);
+            _logger.LogWarning(exception, "Failed to store the bookmarks in '{Name}'.", _name);
         }
         catch (UnauthorizedAccessException exception)
         {
-            _logger.LogWarning(exception, "Not allowed to store the bookmarks in '{File}'.", _filePath);
-        }
-        finally
-        {
-            TryDeleteTemporaryFile(temporaryPath);
+            _logger.LogWarning(exception, "Not allowed to store the bookmarks in '{Name}'.", _name);
         }
     }
 
     /// <summary>
-    /// Moves an unreadable file out of the way, under a name carrying the moment it was set
-    /// aside so an earlier one is not written over.
+    /// Copies unreadable bookmarks out of the way and removes them, under a name carrying the
+    /// moment they were set aside so an earlier copy is not written over.
     /// </summary>
-    private void TrySetAsideUnreadableFile()
+    private async Task TrySetAsideUnreadableAsync(CancellationToken cancellationToken)
     {
         var timestamp = DateTimeOffset.UtcNow.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
-        var setAsidePath = $"{_filePath}.corrupt-{timestamp}";
+        var setAsideName = $"{_name}.corrupt-{timestamp}";
+        var blob = _partition.GetBlob(_name);
 
         try
         {
-            File.Move(_filePath, setAsidePath, overwrite: true);
-            _logger.LogWarning("The unreadable bookmarks file was set aside as '{File}'.", setAsidePath);
-        }
-        catch (IOException exception)
-        {
-            _logger.LogWarning(exception, "Failed to set aside the unreadable bookmarks file '{File}'.", _filePath);
-        }
-        catch (UnauthorizedAccessException exception)
-        {
-            _logger.LogWarning(exception, "Not allowed to set aside the unreadable bookmarks file '{File}'.", _filePath);
-        }
-    }
+            if (await blob.ReadAsync(cancellationToken) is not { } unreadable)
+            {
+                return;
+            }
 
-    private void TryDeleteTemporaryFile(string temporaryPath)
-    {
-        try
-        {
-            File.Delete(temporaryPath);
+            await _partition.GetBlob(setAsideName).WriteAsync(
+                unreadable.Value.ToMemory(),
+                IBlob.AnyOrNoneConcurrencyToken,
+                new(MediaType: unreadable.Info.MediaType),
+                cancellationToken);
+            await blob.DeleteAsync(unreadable.Info.ConcurrencyToken, cancellationToken);
+
+            _logger.LogWarning("The unreadable bookmarks were set aside as '{Name}'.", setAsideName);
         }
         catch (IOException exception)
         {
-            _logger.LogWarning(exception, "Failed to delete the temporary file '{File}'.", temporaryPath);
+            _logger.LogWarning(exception, "Failed to set aside the unreadable bookmarks '{Name}'.", _name);
         }
         catch (UnauthorizedAccessException exception)
         {
-            _logger.LogWarning(exception, "Not allowed to delete the temporary file '{File}'.", temporaryPath);
+            _logger.LogWarning(exception, "Not allowed to set aside the unreadable bookmarks '{Name}'.", _name);
+        }
+        catch (ConflictException exception)
+        {
+            // changed since it was read, so what was copied aside is no longer what is there
+            _logger.LogWarning(exception, "The unreadable bookmarks '{Name}' changed while being set aside.", _name);
         }
     }
 
     /// <summary>
-    /// Indented, and with the fields a story leaves unset left out rather than spelled out as
-    /// nulls: this file is the reader's own, and is meant to be legible if they open it. Generated
+    /// With the fields a story leaves unset left out rather than spelled out as nulls. Generated
     /// at build time rather than reflected over at run time, which a natively compiled app has
     /// nothing to reflect with.
     /// </summary>
     [JsonSourceGenerationOptions(
         JsonSerializerDefaults.Web,
-        WriteIndented = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
     [JsonSerializable(typeof(BookmarkCollection))]
     private sealed partial class BookmarkStoreJsonContext : JsonSerializerContext;

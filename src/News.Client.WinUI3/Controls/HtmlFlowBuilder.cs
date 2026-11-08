@@ -8,6 +8,7 @@ using PeterJuhasz.Text.Html.Model;
 using System.Collections.Frozen;
 using System.Globalization;
 using System.Text.RegularExpressions;
+using Windows.Media.Core;
 using Windows.UI.Text;
 
 namespace News.Client.WinUI3.Controls;
@@ -222,6 +223,10 @@ internal sealed partial class HtmlFlowBuilder : HtmlVisitor
 
             case "img":
                 AppendImage(element, format);
+                break;
+
+            case "video":
+                AppendVideo(element, format);
                 break;
 
             case "a":
@@ -524,6 +529,93 @@ internal sealed partial class HtmlFlowBuilder : HtmlVisitor
     }
 
     /// <summary>
+    /// A video the content addresses over the web: its own src, else the first source child that has
+    /// one. A blob address only means something inside the page that made it, and every other scheme
+    /// is nothing this can fetch, so such a video is left as the markup it came as.
+    /// </summary>
+    private void AppendVideo(HtmlElement element, TextFormat format)
+    {
+        if (FindVideoSource(element) is not { } uri)
+        {
+            VisitOtherElement(element, format);
+            return;
+        }
+
+        if (!_areImagesEnabled)
+        {
+            // a video is fetched from wherever the content says just like a picture is
+            _hasBlockedImages = true;
+            return;
+        }
+
+        var player = new MediaPlayerElement
+        {
+            Source = MediaSource.CreateFromUri(uri),
+            AreTransportControlsEnabled = true,
+            AutoPlay = false,
+            Stretch = Stretch.Uniform,
+            HorizontalAlignment = Microsoft.UI.Xaml.HorizontalAlignment.Left,
+        };
+
+        if (ResolveMediaUri(element.GetAttribute("poster")?.Value) is { } poster)
+        {
+            player.PosterSource = new BitmapImage(poster);
+        }
+
+        var requestedWidth = ReadLength(element, "width");
+        var requestedHeight = ReadLength(element, "height");
+
+        // like images, the player sits directly in the paragraph, never inside a hyperlink
+        EnsureParagraph().Inlines.Add(new InlineUIContainer { Child = player });
+        _widthAppliers.Add(width => ApplyVideoSize(player, requestedWidth, requestedHeight, width));
+        _hyperlink = null;
+        _hyperlinkTarget = null;
+        _lastRun = null;
+        _trimLeadingSpace = false;
+    }
+
+    private static Uri? FindVideoSource(HtmlElement element)
+    {
+        if (ResolveMediaUri(element.GetAttribute("src")?.Value) is { } source)
+        {
+            return source;
+        }
+
+        foreach (var child in element.Nodes)
+        {
+            if (child is HtmlElement { Name: var name } sourceElement &&
+                name.Equals("source", StringComparison.OrdinalIgnoreCase) &&
+                ResolveMediaUri(sourceElement.GetAttribute("src")?.Value) is { } childSource)
+            {
+                return childSource;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>Only web addresses are fetched: blob, data, file and every other scheme are not.</summary>
+    private static Uri? ResolveMediaUri(string? value) =>
+        Uri.TryCreate(value?.Trim(), UriKind.Absolute, out var uri) && uri.Scheme is ("http" or "https")
+            ? uri
+            : null;
+
+    /// <summary>
+    /// Sizes a video like a picture, except that a player shows nothing until the video has loaded,
+    /// so one that was not given a height is held at the usual 16:9 rather than collapsing.
+    /// </summary>
+    private static void ApplyVideoSize(MediaPlayerElement player, HtmlLength? width, HtmlLength? height, double available)
+    {
+        ApplyImageSize(player, width, height, available);
+
+        if (double.IsNaN(player.Height))
+        {
+            var actualWidth = double.IsNaN(player.Width) ? available : player.Width;
+            player.Height = actualWidth * 9 / 16;
+        }
+    }
+
+    /// <summary>
     /// What a picture that is not drawn leaves in its place: what the sender wrote it as, where they
     /// wrote one. A picture nobody described leaves nothing rather than a gap of its own.
     /// </summary>
@@ -544,7 +636,7 @@ internal sealed partial class HtmlFlowBuilder : HtmlVisitor
     /// percentage is of that room, and a picture asking for more than there is is scaled down whole
     /// rather than squashed or cropped.
     /// </summary>
-    private static void ApplyImageSize(Image image, HtmlLength? width, HtmlLength? height, double available)
+    private static void ApplyImageSize(FrameworkElement image, HtmlLength? width, HtmlLength? height, double available)
     {
         image.MaxWidth = available;
 

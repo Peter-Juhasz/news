@@ -636,7 +636,7 @@ public sealed partial class MainViewModel : ObservableObject
                 day.Key,
                 // Ordered by key after date, so stories published at the same moment are put in
                 // the same order every time and the list is not asked to shuffle them about.
-                [.. day.OrderByDescending(item => item.Date).ThenBy(item => item.Key, StringComparer.Ordinal)]))
+                day.OrderByDescending(static item => item.Date).ThenBy(static item => item.Key, StringComparer.Ordinal).ToArray()))
             .ToList();
 
         IsUpdatingList = true;

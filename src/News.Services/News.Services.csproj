@@ -14,7 +14,7 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.*" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="10.*" />
     <PackageReference Include="PeterJuhasz.Repositories.FileSystem" Version="2.*-*" />
-    <PackageReference Include="YamlDotNet" Version="16.*" />
+    <PackageReference Include="PeterJuhasz.Text.Yaml" Version="1.*-*" />
   </ItemGroup>
 
   <!-- The HTML parser depends on PeterJuhasz.Extensions, which adds members to System.Linq: among

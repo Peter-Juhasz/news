@@ -1,23 +1,20 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 using News.Domain;
 using News.Services;
-using YamlDotNet.Serialization;
-using YamlDotNet.Serialization.NamingConventions;
+using PeterJuhasz.Text.Yaml.Model;
+using PeterJuhasz.Text.Yaml.Parsing;
 
 namespace News.Groups;
 
 public sealed partial class GroupsFileLoader
 {
-    private readonly IDeserializer _deserializer = new DeserializerBuilder()
-        .WithNamingConvention(CamelCaseNamingConvention.Instance)
-        .IgnoreUnmatchedProperties()
-        .Build();
+    private static readonly TimeSpan DefaultFrequency = TimeSpan.FromMinutes(30);
 
     public IReadOnlyList<NewsGroup> LoadFromPath(string path)
     {
         var yaml = File.ReadAllText(path);
-        var definition = _deserializer.Deserialize<GroupsDefinition>(yaml)
-            ?? throw new InvalidDataException($"Groups file '{path}' is empty.");
+        var definition = ReadDefinition(yaml, path);
 
         if (definition.Groups.Count == 0)
         {
@@ -219,23 +216,139 @@ public sealed partial class GroupsFileLoader
         return value.Trim();
     }
 
-    private sealed class GroupsDefinition
+    /// <summary>
+    /// The file as written, read off the YAML document by key: keys it does not know are passed over,
+    /// as are keys written with no value.
+    /// </summary>
+    private static GroupsDefinition ReadDefinition(string yaml, string path)
+    {
+        DocumentNode document;
+        try
+        {
+            document = Parser.Parse(yaml);
+        }
+        catch (YamlException exception)
+        {
+            throw new InvalidDataException($"Groups file '{path}' is not valid YAML: {exception.Message}", exception);
+        }
+
+        return document.Root switch
+        {
+            ScalarNode { IsNull: true } => throw new InvalidDataException($"Groups file '{path}' is empty."),
+            MappingNode root => new()
+            {
+                Groups = [.. ReadMappings(root, "groups", location: null).Select(static group => ReadGroup(group.Node, group.Location))]
+            },
+            _ => throw new InvalidDataException($"Groups file '{path}' must be a mapping with a 'groups' list.")
+        };
+    }
+
+    private static GroupDefinition ReadGroup(MappingNode group, string location) => new()
+    {
+        Title = ReadString(group, "title", location) ?? string.Empty,
+        Sources = [.. ReadMappings(group, "sources", location).Select(static source => ReadSource(source.Node, source.Location))]
+    };
+
+    private static SourceDefinition ReadSource(MappingNode source, string location) => new()
+    {
+        Type = ReadString(source, "type", location) ?? string.Empty,
+        Frequency = ReadTimeSpan(source, "frequency", location) ?? DefaultFrequency,
+        Url = ReadString(source, "url", location),
+        Subreddit = ReadString(source, "subreddit", location),
+        ChannelId = ReadString(source, "channelId", location),
+        Repository = ReadString(source, "repository", location),
+        Feed = ReadString(source, "feed", location),
+        Username = ReadString(source, "username", location),
+        Query = ReadString(source, "query", location),
+        Title = ReadString(source, "title", location),
+        View = ReadString(source, "view", location),
+        Selector = ReadString(source, "selector", location),
+        Item = ReadString(source, "item", location),
+        Properties = ReadMapping(source, "properties", location) is { } properties
+            ? ReadItemProperties(properties, ChildLocation(location, "properties"))
+            : null
+    };
+
+    private static ItemPropertiesDefinition ReadItemProperties(MappingNode properties, string location) => new()
+    {
+        Title = ReadString(properties, "title", location),
+        Date = ReadString(properties, "date", location),
+        Lead = ReadString(properties, "lead", location),
+        Url = ReadString(properties, "url", location)
+    };
+
+    /// <summary>
+    /// The mappings of a list, each with where it is written, for the errors in it to point at.
+    /// </summary>
+    private static IReadOnlyList<(MappingNode Node, string Location)> ReadMappings(MappingNode mapping, string key, string? location)
+    {
+        var listLocation = ChildLocation(location, key);
+
+        switch (mapping.TryGetValue(key, out var node) ? node : null)
+        {
+            case null or ScalarNode { IsNull: true }:
+                return [];
+
+            case SequenceNode sequence:
+                var items = new List<(MappingNode, string)>(sequence.Items.Length);
+                foreach (var (item, index) in sequence.Items.Select(static (item, index) => (item, index)))
+                {
+                    var itemLocation = $"{listLocation}[{index}]";
+                    items.Add(item is MappingNode itemMapping
+                        ? (itemMapping, itemLocation)
+                        : throw new InvalidDataException($"'{itemLocation}' must be a mapping of keys and values."));
+                }
+                return items;
+
+            default:
+                throw new InvalidDataException($"'{listLocation}' must be a list.");
+        }
+    }
+
+    private static MappingNode? ReadMapping(MappingNode mapping, string key, string location) =>
+        (mapping.TryGetValue(key, out var node) ? node : null) switch
+        {
+            null or ScalarNode { IsNull: true } => null,
+            MappingNode child => child,
+            _ => throw new InvalidDataException($"'{ChildLocation(location, key)}' must be a mapping of keys and values.")
+        };
+
+    private static string? ReadString(MappingNode mapping, string key, string location) =>
+        (mapping.TryGetValue(key, out var node) ? node : null) switch
+        {
+            null or ScalarNode { IsNull: true } => null,
+            ScalarNode scalar => scalar.Value,
+            _ => throw new InvalidDataException($"'{ChildLocation(location, key)}' must be a single value, not a list or a mapping.")
+        };
+
+    private static TimeSpan? ReadTimeSpan(MappingNode mapping, string key, string location) =>
+        ReadString(mapping, key, location) switch
+        {
+            null => null,
+            var value when TimeSpan.TryParse(value, CultureInfo.InvariantCulture, out var timeSpan) => timeSpan,
+            var value => throw new InvalidDataException(
+                $"Invalid timespan '{value}' for '{ChildLocation(location, key)}'. Expected hours, minutes and seconds, as in '00:30:00'.")
+        };
+
+    private static string ChildLocation(string? location, string key) => location is null ? key : $"{location}.{key}";
+
+    private sealed record GroupsDefinition
     {
         public List<GroupDefinition> Groups { get; init; } = [];
     }
 
-    private sealed class GroupDefinition
+    private sealed record GroupDefinition
     {
         public string Title { get; init; } = string.Empty;
 
         public List<SourceDefinition> Sources { get; init; } = [];
     }
 
-    private sealed class SourceDefinition
+    private sealed record SourceDefinition
     {
         public string Type { get; init; } = string.Empty;
 
-        public TimeSpan Frequency { get; init; } = TimeSpan.FromMinutes(30);
+        public TimeSpan Frequency { get; init; } = DefaultFrequency;
 
         public string? Url { get; init; }
 
@@ -266,7 +379,7 @@ public sealed partial class GroupsFileLoader
     /// Selectors for the properties of a story an HTML source picks out of its page, each run
     /// inside the story's element.
     /// </summary>
-    private sealed class ItemPropertiesDefinition
+    private sealed record ItemPropertiesDefinition
     {
         public string? Title { get; init; }
 

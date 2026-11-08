@@ -2,7 +2,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using News.Configuration;
 using News.Domain;
-using YamlDotNet.Core;
 
 namespace News.Groups;
 
@@ -98,11 +97,8 @@ public sealed class GroupCatalog : IGroupCatalog, IDisposable
                 }
                 catch (InvalidDataException exception)
                 {
+                    // malformed yaml is reported this way too, by the loader
                     _logger.LogWarning(exception, "Skipping groups file '{GroupsFile}' because it is invalid.", _groupsFilePath);
-                }
-                catch (YamlException exception)
-                {
-                    _logger.LogWarning(exception, "Skipping groups file '{GroupsFile}' because YAML parsing failed.", _groupsFilePath);
                 }
             }
 

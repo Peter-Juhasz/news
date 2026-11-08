@@ -18,9 +18,9 @@ groups:
         # Optional: text, html or web. Items from this source are shown in this view.
         view: web
       - type: youtube
-        channelId: UCsBjURrPoezykLs9EqgamOA
+        channelId: UCvtT19MZW8dq5Wwfu6B0oxw
         frequency: 01:00:00
-        title: Fireship
+        title: dotnet
       - type: github
         repository: dotnet/runtime
         # Optional: releases (the default), tags, commits, issues or pulls. Commits are the default

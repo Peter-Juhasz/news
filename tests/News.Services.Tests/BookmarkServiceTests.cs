@@ -12,7 +12,7 @@ namespace News.Services.Tests;
 public sealed class BookmarkServiceTests
 {
     private static readonly RssNewsSource Source =
-        new("https://example.com/feed", TimeSpan.FromMinutes(30)) { Title = "Example" };
+        new("https://example.com/feed") { Title = "Example" };
 
     public required TestContext TestContext { get; set; }
 

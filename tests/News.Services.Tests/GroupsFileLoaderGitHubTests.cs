@@ -1,5 +1,6 @@
 using News.Domain;
 using News.Groups;
+using PeterJuhasz.Repositories.FileSystem;
 
 namespace News.Services.Tests;
 
@@ -22,9 +23,9 @@ public sealed class GroupsFileLoaderGitHubTests
     public void DeleteFile() => File.Delete(_filePath);
 
     [TestMethod]
-    public void LoadFromPath_NoFeedNamed_FollowsTheReleasesFeed()
+    public async Task LoadAsync_NoFeedNamed_FollowsTheReleasesFeed()
     {
-        var source = LoadSingleSource("""
+        var source = await LoadSingleSourceAsync("""
             - type: github
               repository: dotnet/runtime
             """);
@@ -41,9 +42,9 @@ public sealed class GroupsFileLoaderGitHubTests
     [DataRow("Commits", "https://github.com/dotnet/aspnetcore/commits.atom")]
     [DataRow("issues", null)]
     [DataRow("pulls", null)]
-    public void LoadFromPath_FeedNamed_ReadsTheFeedFromItsOwnUrlOrTheApi(string feed, string? feedUrl)
+    public async Task LoadAsync_FeedNamed_ReadsTheFeedFromItsOwnUrlOrTheApi(string feed, string? feedUrl)
     {
-        var source = LoadSingleSource($"""
+        var source = await LoadSingleSourceAsync($"""
             - type: github
               repository: dotnet/aspnetcore
               feed: {feed}
@@ -58,20 +59,20 @@ public sealed class GroupsFileLoaderGitHubTests
     [DataRow("https://github.com/dotnet/runtime")]
     [DataRow("dotnet/runtime/issues")]
     [DataRow("dotnet/run time")]
-    public void LoadFromPath_RepositoryNotOwnerAndName_Throws(string repository)
+    public async Task LoadAsync_RepositoryNotOwnerAndName_Throws(string repository)
     {
         WriteSources($"""
             - type: github
               repository: {repository}
             """);
 
-        Assert.ThrowsExactly<InvalidDataException>(() => new GroupsFileLoader().LoadFromPath(_filePath));
+        await Assert.ThrowsExactlyAsync<InvalidDataException>(() => LoadAsync());
     }
 
     [TestMethod]
     [DataRow("stars")]
     [DataRow("3")]
-    public void LoadFromPath_FeedNotOneGitHubPublishes_Throws(string feed)
+    public async Task LoadAsync_FeedNotOneGitHubPublishes_Throws(string feed)
     {
         WriteSources($"""
             - type: github
@@ -79,15 +80,18 @@ public sealed class GroupsFileLoaderGitHubTests
               feed: "{feed}"
             """);
 
-        Assert.ThrowsExactly<InvalidDataException>(() => new GroupsFileLoader().LoadFromPath(_filePath));
+        await Assert.ThrowsExactlyAsync<InvalidDataException>(() => LoadAsync());
     }
 
-    private NewsSource LoadSingleSource(string sources)
+    private async Task<NewsSource> LoadSingleSourceAsync(string sources)
     {
         WriteSources(sources);
-        var group = Assert.ContainsSingle(new GroupsFileLoader().LoadFromPath(_filePath));
+        var group = Assert.ContainsSingle(await LoadAsync());
         return Assert.ContainsSingle(group.Sources);
     }
+
+    private Task<IReadOnlyList<NewsGroup>> LoadAsync() =>
+        new GroupsFileLoader().LoadAsync(new FileInfo(_filePath).AsBlob(), TestContext.CancellationToken);
 
     private void WriteSources(string sources)
     {

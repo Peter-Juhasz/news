@@ -1,5 +1,6 @@
 using News.Domain;
 using News.Groups;
+using PeterJuhasz.Repositories.FileSystem;
 
 namespace News.Services.Tests;
 
@@ -23,18 +24,17 @@ public sealed class GroupsFileLoaderHtmlTests
     public void DeleteFile() => File.Delete(_filePath);
 
     [TestMethod]
-    public void LoadFromPath_EveryPropertyNamed_ReadsEverySelector()
+    public async Task LoadAsync_EveryPropertyNamed_ReadsEverySelector()
     {
-        var source = LoadSingleSource("""
+        var source = await LoadSingleSourceAsync("""
             - type: html
               url: https://example.com/news
               title: Example
-              item: ul.stories li
-              properties:
-                title: h2
-                date: time
-                lead: p.summary
-                url: 'a[rel="bookmark"]'
+              itemSelector: ul.stories li
+              titleSelector: h2
+              dateSelector: time
+              leadSelector: p.summary
+              urlSelector: 'a[rel="bookmark"]'
               selector: article .entry-content
             """);
 
@@ -51,12 +51,12 @@ public sealed class GroupsFileLoaderHtmlTests
     }
 
     [TestMethod]
-    public void LoadFromPath_NoPropertiesNamed_LeavesEveryPropertySelectorUnset()
+    public async Task LoadAsync_NoPropertiesNamed_LeavesEveryPropertySelectorUnset()
     {
-        var source = LoadSingleSource("""
+        var source = await LoadSingleSourceAsync("""
             - type: html
               url: https://example.com/news
-              item: ul.headlines a
+              itemSelector: ul.headlines a
             """);
 
         var html = Assert.IsInstanceOfType<HtmlNewsSource>(source);
@@ -68,50 +68,52 @@ public sealed class GroupsFileLoaderHtmlTests
     }
 
     [TestMethod]
-    public void LoadFromPath_NoItemSelector_Throws()
+    public async Task LoadAsync_NoItemSelector_Throws()
     {
         WriteSources("""
             - type: html
               url: https://example.com/news
-              properties:
-                title: h2
+              titleSelector: h2
+
             """);
 
-        Assert.ThrowsExactly<InvalidDataException>(() => new GroupsFileLoader().LoadFromPath(_filePath));
+        await Assert.ThrowsExactlyAsync<InvalidDataException>(() => LoadAsync());
     }
 
     [TestMethod]
-    public void LoadFromPath_ItemSelectorTheParserCannotRead_Throws()
+    public async Task LoadAsync_ItemSelectorTheParserCannotRead_Throws()
     {
         WriteSources("""
             - type: html
               url: https://example.com/news
-              item: "article["
+              itemSelector: "article["
             """);
 
-        Assert.ThrowsExactly<InvalidDataException>(() => new GroupsFileLoader().LoadFromPath(_filePath));
+        await Assert.ThrowsExactlyAsync<InvalidDataException>(() => LoadAsync());
     }
 
     [TestMethod]
-    public void LoadFromPath_PropertySelectorTheParserCannotRead_Throws()
+    public async Task LoadAsync_PropertySelectorTheParserCannotRead_Throws()
     {
         WriteSources("""
             - type: html
               url: https://example.com/news
-              item: article
-              properties:
-                date: "time["
+              itemSelector: article
+              dateSelector: "time["
             """);
 
-        Assert.ThrowsExactly<InvalidDataException>(() => new GroupsFileLoader().LoadFromPath(_filePath));
+        await Assert.ThrowsExactlyAsync<InvalidDataException>(() => LoadAsync());
     }
 
-    private NewsSource LoadSingleSource(string sources)
+    private async Task<NewsSource> LoadSingleSourceAsync(string sources)
     {
         WriteSources(sources);
-        var group = Assert.ContainsSingle(new GroupsFileLoader().LoadFromPath(_filePath));
+        var group = Assert.ContainsSingle(await LoadAsync());
         return Assert.ContainsSingle(group.Sources);
     }
+
+    private Task<IReadOnlyList<NewsGroup>> LoadAsync() =>
+        new GroupsFileLoader().LoadAsync(new FileInfo(_filePath).AsBlob(), TestContext.CancellationToken);
 
     private void WriteSources(string sources)
     {

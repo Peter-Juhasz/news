@@ -1,5 +1,6 @@
 using News.Domain;
 using News.Groups;
+using PeterJuhasz.Repositories.FileSystem;
 
 namespace News.Services.Tests;
 
@@ -24,9 +25,9 @@ public sealed class GroupsFileLoaderXTests
     [TestMethod]
     [DataRow("XDevelopers")]
     [DataRow("\"@XDevelopers\"")]
-    public void LoadFromPath_XSource_ReadsTheHandleWithoutItsAt(string username)
+    public async Task LoadAsync_XSource_ReadsTheHandleWithoutItsAt(string username)
     {
-        var source = LoadSingleSource($"""
+        var source = await LoadSingleSourceAsync($"""
             - type: x
               username: {username}
             """);
@@ -41,20 +42,20 @@ public sealed class GroupsFileLoaderXTests
     [DataRow("X Developers")]
     [DataRow("XDevelopersXDevs")]
     [DataRow("\"@\"")]
-    public void LoadFromPath_UsernameNotAHandle_Throws(string username)
+    public async Task LoadAsync_UsernameNotAHandle_Throws(string username)
     {
         WriteSources($"""
             - type: x
               username: {username}
             """);
 
-        Assert.ThrowsExactly<InvalidDataException>(() => new GroupsFileLoader().LoadFromPath(_filePath));
+        await Assert.ThrowsExactlyAsync<InvalidDataException>(() => LoadAsync());
     }
 
     [TestMethod]
-    public void LoadFromPath_XSearchSource_ReadsTheQueryAsWritten()
+    public async Task LoadAsync_XSearchSource_ReadsTheQueryAsWritten()
     {
-        var source = LoadSingleSource("""
+        var source = await LoadSingleSourceAsync("""
             - type: x-search
               query: "#dotnet -is:retweet lang:en"
             """);
@@ -67,22 +68,25 @@ public sealed class GroupsFileLoaderXTests
     [TestMethod]
     [DataRow("x")]
     [DataRow("x-search")]
-    public void LoadFromPath_XSourceNamingNothingToRead_Throws(string type)
+    public async Task LoadAsync_XSourceNamingNothingToRead_Throws(string type)
     {
         WriteSources($"""
             - type: {type}
               title: X
             """);
 
-        Assert.ThrowsExactly<InvalidDataException>(() => new GroupsFileLoader().LoadFromPath(_filePath));
+        await Assert.ThrowsExactlyAsync<InvalidDataException>(() => LoadAsync());
     }
 
-    private NewsSource LoadSingleSource(string sources)
+    private async Task<NewsSource> LoadSingleSourceAsync(string sources)
     {
         WriteSources(sources);
-        var group = Assert.ContainsSingle(new GroupsFileLoader().LoadFromPath(_filePath));
+        var group = Assert.ContainsSingle(await LoadAsync());
         return Assert.ContainsSingle(group.Sources);
     }
+
+    private Task<IReadOnlyList<NewsGroup>> LoadAsync() =>
+        new GroupsFileLoader().LoadAsync(new FileInfo(_filePath).AsBlob(), TestContext.CancellationToken);
 
     private void WriteSources(string sources)
     {

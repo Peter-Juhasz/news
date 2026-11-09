@@ -1,8 +1,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
-using News.Configuration;
 using News.Domain;
 using News.Storage;
+using PeterJuhasz.Repositories.FileSystem;
 
 namespace News.Services.Tests;
 
@@ -163,6 +162,6 @@ public sealed class NewsItemStoreTests
 
     private NewsItemStore CreateStore() =>
         new(
-            Options.Create(new NewsReaderOptions { CacheDirectoryPath = _directoryPath }),
+            new DirectoryInfo(_directoryPath).GetPartition(),
             NullLogger<NewsItemStore>.Instance);
 }

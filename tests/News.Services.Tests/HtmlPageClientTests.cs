@@ -47,8 +47,7 @@ public sealed class HtmlPageClientTests
 
     private static readonly HtmlNewsSource Source = new(
         Url: PageUrl,
-        ItemSelector: "ul.stories li",
-        Frequency: TimeSpan.FromHours(1))
+        ItemSelector: "ul.stories li")
     {
         TitleSelector = "h2",
         DateSelector = ".date",
@@ -117,8 +116,7 @@ public sealed class HtmlPageClientTests
 
         var items = await LoadAsync(page, new HtmlNewsSource(
             Url: PageUrl,
-            ItemSelector: "article",
-            Frequency: TimeSpan.FromHours(1))
+            ItemSelector: "article")
         {
             DateSelector = "span"
         });
@@ -134,8 +132,7 @@ public sealed class HtmlPageClientTests
 
         var items = await LoadAsync(Page, new HtmlNewsSource(
             Url: PageUrl,
-            ItemSelector: "ul.stories h2",
-            Frequency: TimeSpan.FromHours(1)));
+            ItemSelector: "ul.stories h2"));
 
         var after = DateTimeOffset.UtcNow;
 
@@ -154,8 +151,7 @@ public sealed class HtmlPageClientTests
     {
         var items = await LoadAsync(Page, new HtmlNewsSource(
             Url: PageUrl,
-            ItemSelector: "ul.links a",
-            Frequency: TimeSpan.FromHours(1)));
+            ItemSelector: "ul.links a"));
 
         var item = Assert.ContainsSingle(items);
         Assert.AreEqual("About", item.Title);
@@ -178,8 +174,7 @@ public sealed class HtmlPageClientTests
 
         var items = await LoadAsync(page, new HtmlNewsSource(
             Url: PageUrl,
-            ItemSelector: "div p",
-            Frequency: TimeSpan.FromHours(1)));
+            ItemSelector: "div p"));
 
         Assert.AreSequenceEqual(["One", "Two", "Three"], items.Select(item => item.Title));
     }
@@ -194,8 +189,7 @@ public sealed class HtmlPageClientTests
 
         var items = await LoadAsync(page, new HtmlNewsSource(
             Url: PageUrl,
-            ItemSelector: "article",
-            Frequency: TimeSpan.FromHours(1)));
+            ItemSelector: "article"));
 
         Assert.AreEqual("https://cdn.example/archive/story", Assert.ContainsSingle(items).Url);
     }

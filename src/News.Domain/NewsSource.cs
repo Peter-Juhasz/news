@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using PeterJuhasz.Text.Yaml.Serialization;
 
 namespace News.Domain;
 
@@ -6,11 +7,11 @@ namespace News.Domain;
 /// Where items are loaded from, and what a group configures about showing them.
 /// </summary>
 /// <remarks>
-/// Sources are stored whole alongside the items bookmarked from them, so a bookmark outlives the
-/// source being edited or dropped from the groups file. The discriminators below are the names
-/// the groups file already gives these types, so renaming a class does not orphan what was
-/// written under its old name; the computed members are left out of the file, being restated by
-/// whatever is read back rather than read from it.
+/// Sources are read as written from the groups file (YAML), and stored whole alongside the items
+/// bookmarked from them (JSON), so a bookmark outlives the source being edited or dropped from the
+/// groups file. Both name these types by the same discriminators, so renaming a class does not
+/// orphan what was written under its old name; the computed members are left out of either file,
+/// being restated by whatever is read back rather than read from it.
 /// </remarks>
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
 [JsonDerivedType(typeof(RssNewsSource), "rss")]
@@ -21,8 +22,24 @@ namespace News.Domain;
 [JsonDerivedType(typeof(HtmlNewsSource), "html")]
 [JsonDerivedType(typeof(XNewsSource), "x")]
 [JsonDerivedType(typeof(XSearchNewsSource), "x-search")]
-public abstract record NewsSource(TimeSpan Frequency)
+[YamlPolymorphic(TypeDiscriminatorPropertyName = "type", TypeDiscriminatorCaseInsensitive = true)]
+[YamlDerivedType(typeof(RssNewsSource), "rss")]
+[YamlDerivedType(typeof(AtomNewsSource), "atom")]
+[YamlDerivedType(typeof(RedditNewsSource), "reddit")]
+[YamlDerivedType(typeof(YouTubeNewsSource), "youtube")]
+[YamlDerivedType(typeof(GitHubNewsSource), "github")]
+[YamlDerivedType(typeof(HtmlNewsSource), "html")]
+[YamlDerivedType(typeof(XNewsSource), "x")]
+[YamlDerivedType(typeof(XSearchNewsSource), "x-search")]
+public abstract record NewsSource
 {
+    public static readonly TimeSpan DefaultFrequency = TimeSpan.FromMinutes(30);
+
+    /// <summary>
+    /// How long items loaded from this source stay fresh. Half an hour where it is not set.
+    /// </summary>
+    public TimeSpan Frequency { get; init; } = DefaultFrequency;
+
     /// <summary>
     /// Identifies what this source reads, so items stored for it are recognised as its own when
     /// they are read back — including after everything else about it was edited.
@@ -44,7 +61,7 @@ public abstract record NewsSource(TimeSpan Frequency)
         lastLoadedAt is null || Frequency <= TimeSpan.Zero || now - lastLoadedAt.Value >= Frequency;
 }
 
-public sealed record RssNewsSource(string Url, TimeSpan Frequency) : NewsSource(Frequency)
+public sealed record RssNewsSource(string Url) : NewsSource
 {
     [JsonIgnore]
     public override string Key => $"rss:{Url}";
@@ -57,7 +74,7 @@ public sealed record RssNewsSource(string Url, TimeSpan Frequency) : NewsSource(
     public string? Selector { get; init; }
 }
 
-public sealed record AtomNewsSource(string Url, TimeSpan Frequency) : NewsSource(Frequency)
+public sealed record AtomNewsSource(string Url) : NewsSource
 {
     [JsonIgnore]
     public override string Key => $"atom:{Url}";
@@ -70,7 +87,7 @@ public sealed record AtomNewsSource(string Url, TimeSpan Frequency) : NewsSource
     public string? Selector { get; init; }
 }
 
-public sealed record RedditNewsSource(string Subreddit, TimeSpan Frequency) : NewsSource(Frequency)
+public sealed record RedditNewsSource(string Subreddit) : NewsSource
 {
     [JsonIgnore]
     public override string Key => $"reddit:{Subreddit}";
@@ -79,7 +96,7 @@ public sealed record RedditNewsSource(string Subreddit, TimeSpan Frequency) : Ne
     public string FeedUrl => $"https://reddit.com/r/{Subreddit}.rss";
 }
 
-public sealed record YouTubeNewsSource(string ChannelId, TimeSpan Frequency) : NewsSource(Frequency)
+public sealed record YouTubeNewsSource(string ChannelId) : NewsSource
 {
     [JsonIgnore]
     public override string Key => $"youtube:{ChannelId}";
@@ -89,7 +106,8 @@ public sealed record YouTubeNewsSource(string ChannelId, TimeSpan Frequency) : N
 }
 
 /// <param name="Repository">The repository as GitHub names it, owner first: <c>dotnet/runtime</c>.</param>
-public sealed record GitHubNewsSource(string Repository, GitHubFeed Feed, TimeSpan Frequency) : NewsSource(Frequency)
+/// <param name="Feed">What to follow in it; releases, being what a repository publishes for its readers, where none is named.</param>
+public sealed record GitHubNewsSource(string Repository, GitHubFeed Feed = GitHubFeed.Releases) : NewsSource
 {
     [JsonIgnore]
     public override string Key => $"github:{Repository}/{Feed.ToString().ToLowerInvariant()}";
@@ -119,7 +137,7 @@ public sealed record GitHubNewsSource(string Repository, GitHubFeed Feed, TimeSp
 /// </remarks>
 /// <param name="Url">The page listing the stories.</param>
 /// <param name="ItemSelector">Picks each story out of the page.</param>
-public sealed record HtmlNewsSource(string Url, string ItemSelector, TimeSpan Frequency) : NewsSource(Frequency)
+public sealed record HtmlNewsSource(string Url, string ItemSelector) : NewsSource
 {
     [JsonIgnore]
     public override string Key => $"html:{Url}";
@@ -161,7 +179,7 @@ public sealed record HtmlNewsSource(string Url, string ItemSelector, TimeSpan Fr
 /// The newest posts of an account on X, read from X's API.
 /// </summary>
 /// <param name="Username">The account's handle, without the <c>@</c>: <c>XDevelopers</c>.</param>
-public sealed record XNewsSource(string Username, TimeSpan Frequency) : NewsSource(Frequency)
+public sealed record XNewsSource(string Username) : NewsSource
 {
     [JsonIgnore]
     public override string Key => $"x:{Username}";
@@ -171,7 +189,7 @@ public sealed record XNewsSource(string Username, TimeSpan Frequency) : NewsSour
 /// The newest posts on X matching a search, read from X's API.
 /// </summary>
 /// <param name="Query">The search in X's query language, as in <c>#dotnet -is:retweet lang:en</c>.</param>
-public sealed record XSearchNewsSource(string Query, TimeSpan Frequency) : NewsSource(Frequency)
+public sealed record XSearchNewsSource(string Query) : NewsSource
 {
     [JsonIgnore]
     public override string Key => $"x-search:{Query}";

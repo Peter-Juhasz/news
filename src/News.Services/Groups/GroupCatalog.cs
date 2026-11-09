@@ -2,6 +2,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using News.Configuration;
 using News.Domain;
+using PeterJuhasz.Repositories.Blobs;
+using PeterJuhasz.Repositories.FileSystem;
 
 namespace News.Groups;
 
@@ -10,6 +12,7 @@ public sealed class GroupCatalog : IGroupCatalog, IDisposable
     private readonly GroupsFileLoader _groupsFileLoader;
     private readonly ILogger<GroupCatalog> _logger;
     private readonly string _groupsFilePath;
+    private readonly IBlob _groupsFile;
     private readonly SemaphoreSlim _reloadLock = new(1, 1);
     private FileSystemWatcher? _watcher;
     private SynchronizationContext? _uiContext;
@@ -22,6 +25,7 @@ public sealed class GroupCatalog : IGroupCatalog, IDisposable
         _groupsFileLoader = groupsFileLoader;
         _logger = logger;
         _groupsFilePath = ConfiguredPath.Resolve(options.Value.GroupsFilePath);
+        _groupsFile = new FileInfo(_groupsFilePath).AsBlob();
     }
 
     public event EventHandler<IReadOnlyList<NewsGroup>>? GroupsChanged;
@@ -77,7 +81,7 @@ public sealed class GroupCatalog : IGroupCatalog, IDisposable
         {
             var groups = new List<NewsGroup>();
 
-            if (!File.Exists(_groupsFilePath))
+            if (!await _groupsFile.ExistsAsync(cancellationToken))
             {
                 _logger.LogWarning("Groups file '{GroupsFile}' was not found.", _groupsFilePath);
             }
@@ -85,7 +89,7 @@ public sealed class GroupCatalog : IGroupCatalog, IDisposable
             {
                 try
                 {
-                    groups.AddRange(_groupsFileLoader.LoadFromPath(_groupsFilePath));
+                    groups.AddRange(await _groupsFileLoader.LoadAsync(_groupsFile, cancellationToken));
                 }
                 catch (IOException exception)
                 {

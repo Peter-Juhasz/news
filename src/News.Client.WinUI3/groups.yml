@@ -41,16 +41,15 @@ groups:
       #   frequency: 01:00:00
       #   title: Example News
       #   # Picks each story out of the page.
-      #   item: ul.stories li
+      #   itemSelector: ul.stories li
       #   # Optional, each picked out of the story. Without a title, the story's whole text is its
       #   # title; without a url, its link is the story itself or the first link inside it. A date
       #   # is read from a datetime attribute, as on <time>, or else from the text, in the language
       #   # the page declares; a story without one is dated when it is loaded.
-      #   properties:
-      #     title: h2
-      #     date: time
-      #     lead: p.summary
-      #     url: h2 a
+      #   titleSelector: h2
+      #   dateSelector: time
+      #   leadSelector: p.summary
+      #   urlSelector: h2 a
       # x for an account's newest posts on X, leaving out its replies and reposts. It and x-search
       # read X's API as an X app, whose API key and secret are set as X__ApiKey and X__ApiSecret in
       # the environment or the .env file. X charges for each post a load returns, though not again

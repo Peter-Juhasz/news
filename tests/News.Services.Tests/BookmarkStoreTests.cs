@@ -50,8 +50,9 @@ public sealed class BookmarkStoreTests
     public async Task LoadAsync_AfterSave_ReturnsTheSourceAsTheKindItWas()
     {
         var store = CreateStore();
-        var source = new RssNewsSource("https://example.com/feed", TimeSpan.FromMinutes(30))
+        var source = new RssNewsSource("https://example.com/feed")
         {
+            Frequency = TimeSpan.FromMinutes(45),
             Title = "Example",
             View = NewsContentMode.Html,
             Selector = "article .entry-content"
@@ -66,7 +67,7 @@ public sealed class BookmarkStoreTests
         var stored = bookmarks.Items.Single();
         var storedSource = Assert.IsInstanceOfType<RssNewsSource>(stored.Source);
         Assert.AreEqual("https://example.com/feed", storedSource.Url);
-        Assert.AreEqual(TimeSpan.FromMinutes(30), storedSource.Frequency);
+        Assert.AreEqual(TimeSpan.FromMinutes(45), storedSource.Frequency);
         Assert.AreEqual("Example", storedSource.Title);
         Assert.AreEqual(NewsContentMode.Html, storedSource.View);
         Assert.AreEqual("article .entry-content", storedSource.Selector);
@@ -80,22 +81,22 @@ public sealed class BookmarkStoreTests
 
         await store.SaveAsync(
             new BookmarkCollection([
-                CreateBookmark(new RssNewsSource("https://example.com/feed", TimeSpan.FromMinutes(30)), "1"),
-                CreateBookmark(new AtomNewsSource("https://example.com/atom", TimeSpan.FromMinutes(30)), "2"),
-                CreateBookmark(new RedditNewsSource("dotnet", TimeSpan.FromMinutes(15)), "3"),
-                CreateBookmark(new YouTubeNewsSource("UC-channel", TimeSpan.FromHours(1)), "4"),
-                CreateBookmark(new GitHubNewsSource("dotnet/runtime", GitHubFeed.Pulls, TimeSpan.FromHours(1)), "5"),
+                CreateBookmark(new RssNewsSource("https://example.com/feed") { Frequency = TimeSpan.FromMinutes(30) }, "1"),
+                CreateBookmark(new AtomNewsSource("https://example.com/atom") { Frequency = TimeSpan.FromMinutes(30) }, "2"),
+                CreateBookmark(new RedditNewsSource("dotnet") { Frequency = TimeSpan.FromMinutes(15) }, "3"),
+                CreateBookmark(new YouTubeNewsSource("UC-channel") { Frequency = TimeSpan.FromHours(1) }, "4"),
+                CreateBookmark(new GitHubNewsSource("dotnet/runtime", GitHubFeed.Pulls) { Frequency = TimeSpan.FromHours(1) }, "5"),
                 CreateBookmark(
                     new HtmlNewsSource(
                         Url: "https://example.com/news",
-                        ItemSelector: "ul.stories li",
-                        Frequency: TimeSpan.FromHours(1))
+                        ItemSelector: "ul.stories li")
                     {
+                        Frequency = TimeSpan.FromHours(1),
                         TitleSelector = "h2"
                     },
                     "6"),
-                CreateBookmark(new XNewsSource("XDevelopers", TimeSpan.FromHours(1)), "7"),
-                CreateBookmark(new XSearchNewsSource("#dotnet -is:retweet", TimeSpan.FromHours(1)), "8")
+                CreateBookmark(new XNewsSource("XDevelopers") { Frequency = TimeSpan.FromHours(1) }, "7"),
+                CreateBookmark(new XSearchNewsSource("#dotnet -is:retweet") { Frequency = TimeSpan.FromHours(1) }, "8")
             ]),
             TestContext.CancellationToken);
 
@@ -129,7 +130,7 @@ public sealed class BookmarkStoreTests
         var store = CreateStore();
 
         await store.SaveAsync(
-            new BookmarkCollection([CreateBookmark(new RedditNewsSource("dotnet", TimeSpan.FromMinutes(15)))]),
+            new BookmarkCollection([CreateBookmark(new RedditNewsSource("dotnet") { Frequency = TimeSpan.FromMinutes(15) })]),
             TestContext.CancellationToken);
 
         var json = await File.ReadAllTextAsync(_filePath, TestContext.CancellationToken);
@@ -150,7 +151,7 @@ public sealed class BookmarkStoreTests
         var store = CreateStore();
 
         await store.SaveAsync(
-            new BookmarkCollection([CreateBookmark(new RssNewsSource("https://example.com/feed", TimeSpan.FromMinutes(30)))]),
+            new BookmarkCollection([CreateBookmark(new RssNewsSource("https://example.com/feed") { Frequency = TimeSpan.FromMinutes(30) })]),
             TestContext.CancellationToken);
 
         var json = await File.ReadAllTextAsync(_filePath, TestContext.CancellationToken);
@@ -202,7 +203,7 @@ public sealed class BookmarkStoreTests
                 Title: title,
                 Lead: "The lead",
                 Url: $"https://example.com/{id}"),
-            source ?? new RssNewsSource("https://example.com/feed", TimeSpan.FromMinutes(30)),
+            source ?? new RssNewsSource("https://example.com/feed") { Frequency = TimeSpan.FromMinutes(30) },
             new DateTimeOffset(2026, 9, 4, 9, 0, 0, TimeSpan.Zero));
 
     private BookmarkStore CreateStore() =>

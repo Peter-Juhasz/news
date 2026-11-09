@@ -91,7 +91,9 @@ public partial class App : Application
         builder.Services.AddSingleton<GroupsFileLoader>();
         builder.Services.AddSingleton<IGroupCatalog, GroupCatalog>();
         builder.Services.AddSingleton<INewsSourceClient, NewsSourceClient>();
-        builder.Services.AddSingleton<INewsItemStore, NewsItemStore>();
+        builder.Services.AddSingleton<INewsItemStore>(static provider => new NewsItemStore(
+            new DirectoryInfo(ConfiguredPath.Resolve(provider.GetRequiredService<IOptions<NewsReaderOptions>>().Value.CacheDirectoryPath)).GetPartition(),
+            provider.GetRequiredService<ILogger<NewsItemStore>>()));
         builder.Services.AddSingleton<IBookmarkStore>(static provider =>
         {
             var file = new FileInfo(ConfiguredPath.Resolve(provider.GetRequiredService<IOptions<NewsReaderOptions>>().Value.BookmarksFilePath));

@@ -77,7 +77,7 @@ public sealed partial class XClient(HttpClient httpClient, ILogger<XClient> logg
         var page = await GetAsync(url, XJsonContext.Default.Page, cancellationToken);
         var items = ToNewsItems(page, _ => user, showsAuthor: false);
 
-        logger.LogDebug("Loaded {Count} items from {Url}", items.Count, url);
+        LogLoaded(items.Count, url);
         return items;
     }
 
@@ -99,7 +99,7 @@ public sealed partial class XClient(HttpClient httpClient, ILogger<XClient> logg
             post => post.AuthorId is { } authorId ? authors.GetValueOrDefault(authorId) : null,
             showsAuthor: true);
 
-        logger.LogDebug("Loaded {Count} items from {Url}", items.Count, url);
+        LogLoaded(items.Count, url);
         return items;
     }
 
@@ -390,4 +390,7 @@ public sealed partial class XClient(HttpClient httpClient, ILogger<XClient> logg
     [JsonSerializable(typeof(UserResult))]
     [JsonSerializable(typeof(Problem))]
     private sealed partial class XJsonContext : JsonSerializerContext;
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Loaded {Count} items from {Url}")]
+    private partial void LogLoaded(int count, string url);
 }

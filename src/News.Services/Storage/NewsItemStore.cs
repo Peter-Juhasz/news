@@ -39,17 +39,17 @@ public sealed partial class NewsItemStore(IBlobPartition partition, ILogger<News
         }
         catch (IOException exception)
         {
-            logger.LogWarning(exception, "Failed to read the stored items of group '{Group}'.", groupTitle);
+            LogReadFailed(exception, groupTitle);
         }
         catch (UnauthorizedAccessException exception)
         {
-            logger.LogWarning(exception, "Not allowed to read the stored items of group '{Group}'.", groupTitle);
+            LogReadNotAllowed(exception, groupTitle);
         }
         catch (JsonException exception)
         {
             // written by an older shape of these records, or left half-written by a machine that
             // lost power mid-save. the next full load replaces it.
-            logger.LogWarning(exception, "Discarding the unreadable stored items of group '{Group}'.", groupTitle);
+            LogDiscardingUnreadable(exception, groupTitle);
         }
 
         return null;
@@ -65,11 +65,11 @@ public sealed partial class NewsItemStore(IBlobPartition partition, ILogger<News
         }
         catch (IOException exception)
         {
-            logger.LogWarning(exception, "Failed to store the items of group '{Group}'.", groupTitle);
+            LogStoreFailed(exception, groupTitle);
         }
         catch (UnauthorizedAccessException exception)
         {
-            logger.LogWarning(exception, "Not allowed to store the items of group '{Group}'.", groupTitle);
+            LogStoreNotAllowed(exception, groupTitle);
         }
     }
 
@@ -129,4 +129,19 @@ public sealed partial class NewsItemStore(IBlobPartition partition, ILogger<News
     [JsonSourceGenerationOptions(JsonSerializerDefaults.Web)]
     [JsonSerializable(typeof(NewsGroupSnapshot))]
     private sealed partial class NewsItemStoreJsonContext : JsonSerializerContext;
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to read the stored items of group '{Group}'.")]
+    private partial void LogReadFailed(Exception exception, string group);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Not allowed to read the stored items of group '{Group}'.")]
+    private partial void LogReadNotAllowed(Exception exception, string group);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Discarding the unreadable stored items of group '{Group}'.")]
+    private partial void LogDiscardingUnreadable(Exception exception, string group);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to store the items of group '{Group}'.")]
+    private partial void LogStoreFailed(Exception exception, string group);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Not allowed to store the items of group '{Group}'.")]
+    private partial void LogStoreNotAllowed(Exception exception, string group);
 }

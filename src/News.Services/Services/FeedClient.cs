@@ -9,7 +9,7 @@ namespace News.Services;
 /// Downloads a feed and hands the document to the format's parser. The Media RSS readers live here
 /// too, since RSS items and Atom entries carry the module alike.
 /// </summary>
-public abstract class FeedClient(HttpClient httpClient, ILogger logger)
+public abstract partial class FeedClient(HttpClient httpClient, ILogger logger)
 {
     /// <summary>
     /// Media RSS, which YouTube and many publishers use to carry the description,
@@ -30,11 +30,14 @@ public abstract class FeedClient(HttpClient httpClient, ILogger logger)
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
         var document = await XDocument.LoadAsync(stream, LoadOptions.None, cancellationToken);
         var items = Parse(document);
-        logger.LogDebug("Loaded {Count} items from {Url}", items.Count, url);
+        LogLoaded(items.Count, url);
         return items;
     }
 
     public abstract IReadOnlyList<NewsItem> Parse(XDocument document);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Loaded {Count} items from {Url}")]
+    private partial void LogLoaded(int count, string url);
 
     /// <summary>
     /// The document's root, provided it is the one the format names; a feed of some other format

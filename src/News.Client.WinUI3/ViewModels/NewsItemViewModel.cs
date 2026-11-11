@@ -1,3 +1,4 @@
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using News.Domain;
 using News.Services;
@@ -152,7 +153,7 @@ public sealed partial class NewsItemViewModel : ObservableObject
 
     public bool HasMeta => MetaText.Length > 0;
 
-    public string TimeText => Date.ToLocalTime().ToString("HH:mm");
+    public string TimeText => Date.ToLocalTime().ToString("HH:mm", CultureInfo.CurrentCulture);
 
     /// <summary>
     /// Query the list is filtered by, so a row can mark where it matches it. A row that stays in
@@ -299,6 +300,6 @@ public sealed partial class NewsItemViewModel : ObservableObject
         >= 1_000_000_000 => $"{value / 1_000_000_000d:0.#}B",
         >= 1_000_000 => $"{value / 1_000_000d:0.#}M",
         >= 10_000 => $"{value / 1_000d:0.#}K",
-        _ => value.ToString("N0")
+        _ => value.ToString("N0", CultureInfo.CurrentCulture)
     };
 }

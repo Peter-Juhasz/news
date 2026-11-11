@@ -9,6 +9,7 @@ using News.Groups;
 using News.Services;
 using News.Storage;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using Windows.ApplicationModel.DataTransfer;
@@ -16,7 +17,7 @@ using Windows.System;
 
 namespace News.Client.WinUI3.ViewModels;
 
-public sealed partial class MainViewModel : ObservableObject
+public sealed partial class MainViewModel : ObservableObject, IDisposable
 {
     /// <summary>
     /// How long typing has to pause before the search text reaches the list. Long enough that a
@@ -64,6 +65,11 @@ public sealed partial class MainViewModel : ObservableObject
     /// Every keystroke in the search box, on its way to <see cref="ApplyQuery"/>.
     /// </summary>
     private readonly Subject<string> _searchTextInput = new();
+
+    /// <summary>
+    /// The subscription that applies the settled search text, released with the view model.
+    /// </summary>
+    private readonly IDisposable _searchSubscription;
 
     /// <summary>
     /// The trimmed query <see cref="DayGroups"/> was last built against. It trails
@@ -130,13 +136,25 @@ public sealed partial class MainViewModel : ObservableObject
             .DistinctUntilChanged(StringComparer.Ordinal);
 
         // Throttle's timer runs on a pool thread, while the collections a query rebuilds belong
-        // to the thread this view model is built on — the UI one. Nothing unsubscribes: the
-        // subscription reaches no further than the subject it reads, both of which live exactly
-        // as long as this view model does.
-        _ = (SynchronizationContext.Current is { } uiContext
+        // to the thread this view model is built on — the UI one. The subscription is released
+        // along with the subject it reads when the view model is disposed.
+        _searchSubscription = (SynchronizationContext.Current is { } uiContext
                 ? searchQueries.ObserveOn(uiContext)
                 : searchQueries)
             .Subscribe(ApplyQuery);
+    }
+
+    public void Dispose()
+    {
+        _bookmarkService.Changed -= OnBookmarksChanged;
+        _searchSubscription.Dispose();
+        _searchTextInput.Dispose();
+
+        _contentLoad?.Cancel();
+        _contentLoad?.Dispose();
+        _contentLoad = null;
+
+        _selectionLock.Dispose();
     }
 
     public ObservableCollection<NewsGroupViewModelBase> Groups { get; } = [];
@@ -219,7 +237,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     public string SelectedTitle => SelectedItem?.Title ?? "Select a story";
 
-    public string SelectedDateTimeText => SelectedItem?.Date.ToLocalTime().ToString("f") ?? string.Empty;
+    public string SelectedDateTimeText => SelectedItem?.Date.ToLocalTime().ToString("f", CultureInfo.CurrentCulture) ?? string.Empty;
 
     public string SelectedSource => SelectedItem?.SourceName ?? string.Empty;
 
@@ -776,7 +794,7 @@ public sealed partial class MainViewModel : ObservableObject
             // A page that cannot be fetched — a failed request, a timeout, an open circuit —
             // leaves the story on the body the feed carried, and is left unfetched so returning
             // to it tries the page again. Nothing is worth faulting this fetch-and-forget task.
-            _logger.LogWarning(exception, "Failed to load the '{Selector}' content of {Url}.", selector, item.Url);
+            LogContentLoadFailed(exception, selector, item.Url);
         }
         finally
         {
@@ -793,6 +811,9 @@ public sealed partial class MainViewModel : ObservableObject
             load.Dispose();
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to load the '{Selector}' content of {Url}.")]
+    private partial void LogContentLoadFailed(Exception exception, string selector, string url);
 
     private NewsContentMode ResolveContentMode(NewsItemViewModel? item)
     {

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.RegularExpressions;
 using News.Domain;
 using News.Services;
@@ -22,6 +23,7 @@ public sealed partial class GroupsFileLoader
         PropertyNamingPolicy = YamlNamingPolicy.CamelCase
     };
 
+    [SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "Resolved from the container and handed to the catalog as an instance, so tests and callers can substitute it.")]
     public async Task<IReadOnlyList<NewsGroup>> LoadAsync(IBlob blob, CancellationToken cancellationToken)
     {
         var definition = await ReadDefinitionAsync(blob, cancellationToken);

@@ -10,7 +10,7 @@ namespace News.Services;
 /// source's item selector picks is a story, and its title, date, lead and link are picked out of
 /// that element with the selectors the source gives for them.
 /// </summary>
-public sealed class HtmlPageClient(HttpClient httpClient, ILogger<HtmlPageClient> logger) : IHtmlPageClient
+public sealed partial class HtmlPageClient(HttpClient httpClient, ILogger<HtmlPageClient> logger) : IHtmlPageClient
 {
     public async Task<IReadOnlyList<NewsItem>> LoadAsync(HtmlNewsSource source, CancellationToken cancellationToken)
     {
@@ -47,7 +47,7 @@ public sealed class HtmlPageClient(HttpClient httpClient, ILogger<HtmlPageClient
             throw new FormatException($"The item selector '{source.ItemSelector}' matched no story in {source.Url}.");
         }
 
-        logger.LogDebug("Loaded {Count} items from {Url}", items.Count, source.Url);
+        LogLoaded(items.Count, source.Url);
         return items;
     }
 
@@ -163,4 +163,7 @@ public sealed class HtmlPageClient(HttpClient httpClient, ILogger<HtmlPageClient
     }
 
     private sealed record Page(Uri BaseUri, CultureInfo? Culture, DateTimeOffset LoadedAt);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Loaded {Count} items from {Url}")]
+    private partial void LogLoaded(int count, string url);
 }

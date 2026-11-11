@@ -7,7 +7,7 @@ using PeterJuhasz.Repositories.FileSystem;
 
 namespace News.Groups;
 
-public sealed class GroupCatalog : IGroupCatalog, IDisposable
+public sealed partial class GroupCatalog : IGroupCatalog, IDisposable
 {
     private readonly GroupsFileLoader _groupsFileLoader;
     private readonly ILogger<GroupCatalog> _logger;
@@ -83,7 +83,7 @@ public sealed class GroupCatalog : IGroupCatalog, IDisposable
 
             if (!await _groupsFile.ExistsAsync(cancellationToken))
             {
-                _logger.LogWarning("Groups file '{GroupsFile}' was not found.", _groupsFilePath);
+                LogNotFound(_groupsFilePath);
             }
             else
             {
@@ -93,16 +93,16 @@ public sealed class GroupCatalog : IGroupCatalog, IDisposable
                 }
                 catch (IOException exception)
                 {
-                    _logger.LogWarning(exception, "Skipping groups file '{GroupsFile}' due to file access error.", _groupsFilePath);
+                    LogFileAccessError(exception, _groupsFilePath);
                 }
                 catch (UnauthorizedAccessException exception)
                 {
-                    _logger.LogWarning(exception, "Skipping groups file '{GroupsFile}' due to permission error.", _groupsFilePath);
+                    LogPermissionError(exception, _groupsFilePath);
                 }
                 catch (InvalidDataException exception)
                 {
                     // malformed yaml is reported this way too, by the loader
-                    _logger.LogWarning(exception, "Skipping groups file '{GroupsFile}' because it is invalid.", _groupsFilePath);
+                    LogInvalid(exception, _groupsFilePath);
                 }
             }
 
@@ -131,4 +131,16 @@ public sealed class GroupCatalog : IGroupCatalog, IDisposable
 
         _uiContext.Post(_ => handler(this, CurrentGroups), null);
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Groups file '{GroupsFile}' was not found.")]
+    private partial void LogNotFound(string groupsFile);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Skipping groups file '{GroupsFile}' due to file access error.")]
+    private partial void LogFileAccessError(Exception exception, string groupsFile);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Skipping groups file '{GroupsFile}' due to permission error.")]
+    private partial void LogPermissionError(Exception exception, string groupsFile);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Skipping groups file '{GroupsFile}' because it is invalid.")]
+    private partial void LogInvalid(Exception exception, string groupsFile);
 }

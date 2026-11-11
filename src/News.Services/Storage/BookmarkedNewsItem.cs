@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using News.Domain;
 
 namespace News.Storage;
@@ -24,6 +25,7 @@ public sealed record BookmarkedNewsItem(
 /// Every bookmark, as one file. A record rather than a bare list so the file has somewhere to
 /// grow without what is already written becoming unreadable.
 /// </summary>
+[SuppressMessage("Naming", "CA1711:Identifiers should not have incorrect suffix", Justification = "A record that models the bookmarks file, not a collection type.")]
 public sealed record BookmarkCollection(IReadOnlyList<BookmarkedNewsItem> Items)
 {
     public static BookmarkCollection Empty { get; } = new([]);

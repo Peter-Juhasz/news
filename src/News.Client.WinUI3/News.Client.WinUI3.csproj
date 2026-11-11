@@ -1,12 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <TargetFramework>net11.0-windows10.0.26100.0</TargetFramework>
     <TargetPlatformMinVersion>10.0.26100.0</TargetPlatformMinVersion>
     <SupportedOSPlatformVersion>10.0.26100.0</SupportedOSPlatformVersion>
     <RootNamespace>News.Client.WinUI3</RootNamespace>
     <UseWinUI>true</UseWinUI>
-    <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>news</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
@@ -22,24 +21,24 @@
     <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' And '$(Platform)' == 'ARM64'">win-arm64</RuntimeIdentifier>
     <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-x64</RuntimeIdentifier>
 
-    <!-- A native AOT publish otherwise takes the SDK's shortened path, which compiles the XAML
-         before the references are resolved: the XAML compiler then finds no WinUI types to compile
-         against and fails with WMC1007. -->
-    <UseOptimizedPublish>false</UseOptimizedPublish>
-
     <!-- CsWinRT writes the WinRT interfaces of the generic collections handed to WinUI — the day
          groups, the group list — in unsafe code, and without leave to do so it quietly writes none:
          a natively compiled app then has nothing to hand over, and the list turns them away. -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+    <!-- The experimental Windows App SDK generates XamlTypeInfo code that uses its own
+         evaluation-only controls (charts, tabular), which warns CS8305 in code this project
+         does not write. -->
+    <NoWarn>$(NoWarn);CS8305</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="PeterJuhasz.Text.Html" Version="1.*-*" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.*" />
     <PackageReference Include="CommunityToolkit.WinUI.Controls.Sizers" Version="8.*" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.*" />
-    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.*" />
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.*" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="11.*" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="11.*" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.*-experimental*" />
     <PackageReference Include="System.Reactive" Version="7.*" />
   </ItemGroup>
 

@@ -1,9 +1,7 @@
 <Project Sdk="MSTest.Sdk/4.3.3">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>News.Services.Tests</RootNamespace>
-    <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
   <ItemGroup>

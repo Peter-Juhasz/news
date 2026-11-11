@@ -7,7 +7,7 @@ namespace News.Bookmarks;
 /// <summary>
 /// Holds the bookmarks for as long as the app runs, and is the only thing that writes them.
 /// </summary>
-public sealed class BookmarkService : IBookmarkService, IDisposable
+public sealed partial class BookmarkService : IBookmarkService, IDisposable
 {
     /// <summary>
     /// How bookmarks are told apart. The comparison a group merges its sources under, so a story
@@ -37,7 +37,7 @@ public sealed class BookmarkService : IBookmarkService, IDisposable
     /// </summary>
     private readonly List<BookmarkedNewsItem> _order = [];
 
-    private IReadOnlyList<BookmarkedNewsItem> _current = [];
+    private BookmarkedNewsItem[] _current = [];
     private SynchronizationContext? _uiContext;
     private bool _initialized;
 
@@ -95,7 +95,7 @@ public sealed class BookmarkService : IBookmarkService, IDisposable
             Publish();
         }
 
-        _logger.LogDebug("Restored {Count} bookmarks.", _current.Count);
+        LogRestored(_current.Length);
         RaiseChanged();
     }
 
@@ -175,4 +175,7 @@ public sealed class BookmarkService : IBookmarkService, IDisposable
 
         _uiContext.Post(_ => handler(this, EventArgs.Empty), null);
     }
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Restored {Count} bookmarks.")]
+    private partial void LogRestored(int count);
 }

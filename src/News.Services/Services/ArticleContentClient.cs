@@ -8,7 +8,7 @@ namespace News.Services;
 /// the source's selector picks is handed back as HTML. Feeds that publish only a teaser can be read
 /// in full this way.
 /// </summary>
-public sealed class ArticleContentClient(HttpClient httpClient, ILogger<ArticleContentClient> logger)
+public sealed partial class ArticleContentClient(HttpClient httpClient, ILogger<ArticleContentClient> logger)
     : IArticleContentClient
 {
     public async Task<string?> LoadAsync(string url, string selector, CancellationToken cancellationToken)
@@ -31,20 +31,29 @@ public sealed class ArticleContentClient(HttpClient httpClient, ILogger<ArticleC
         }
         catch (ArgumentException exception)
         {
-            logger.LogWarning(exception, "Selector '{Selector}' is not a valid CSS selector.", selector);
+            LogInvalidSelector(exception, selector);
             return null;
         }
 
         if (element is null)
         {
-            logger.LogDebug("Selector '{Selector}' matched nothing in {Url}.", selector, url);
+            LogNoMatch(selector, url);
             return null;
         }
 
         // A redirect moves the page, and the addresses inside it resolve against wherever it landed.
         var baseUri = HtmlAddresses.ResolveBaseUri(document, response.RequestMessage?.RequestUri ?? new Uri(url));
 
-        logger.LogDebug("Loaded the '{Selector}' content of {Url}.", selector, url);
+        LogLoaded(selector, url);
         return HtmlAddresses.WriteWithAbsoluteAddresses(element, baseUri);
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Selector '{Selector}' is not a valid CSS selector.")]
+    private partial void LogInvalidSelector(Exception exception, string selector);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Selector '{Selector}' matched nothing in {Url}.")]
+    private partial void LogNoMatch(string selector, string url);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Loaded the '{Selector}' content of {Url}.")]
+    private partial void LogLoaded(string selector, string url);
 }

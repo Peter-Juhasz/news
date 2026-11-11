@@ -7,7 +7,7 @@ using News.Storage;
 
 namespace News.Client.WinUI3.ViewModels;
 
-public sealed class NewsGroupViewModel(
+public sealed partial class NewsGroupViewModel(
     NewsGroup group,
     INewsSourceClient newsSourceClient,
     INewsItemStore newsItemStore,
@@ -173,31 +173,49 @@ public sealed class NewsGroupViewModel(
         }
         catch (HttpRequestException exception)
         {
-            logger.LogWarning(exception, "Failed to load source {SourceType}. Keeping last successful items.", source.GetType().Name);
+            LogLoadFailed(exception, source.GetType().Name);
         }
         catch (TaskCanceledException exception) when (!cancellationToken.IsCancellationRequested)
         {
-            logger.LogWarning(exception, "Loading source {SourceType} timed out. Keeping last successful items.", source.GetType().Name);
+            LogLoadTimedOut(exception, source.GetType().Name);
         }
         catch (FormatException exception)
         {
-            logger.LogWarning(exception, "Feed parsing failed for source {SourceType}. Keeping last successful items.", source.GetType().Name);
+            LogParsingFailed(exception, source.GetType().Name);
         }
         catch (XmlException exception)
         {
-            logger.LogWarning(exception, "Feed XML parsing failed for source {SourceType}. Keeping last successful items.", source.GetType().Name);
+            LogXmlParsingFailed(exception, source.GetType().Name);
         }
         catch (JsonException exception)
         {
-            logger.LogWarning(exception, "Feed JSON parsing failed for source {SourceType}. Keeping last successful items.", source.GetType().Name);
+            LogJsonParsingFailed(exception, source.GetType().Name);
         }
         catch (InvalidDataException exception)
         {
-            logger.LogWarning(exception, "Feed data was invalid for source {SourceType}. Keeping last successful items.", source.GetType().Name);
+            LogInvalidData(exception, source.GetType().Name);
         }
 
         return false;
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to load source {SourceType}. Keeping last successful items.")]
+    private partial void LogLoadFailed(Exception exception, string sourceType);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Loading source {SourceType} timed out. Keeping last successful items.")]
+    private partial void LogLoadTimedOut(Exception exception, string sourceType);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Feed parsing failed for source {SourceType}. Keeping last successful items.")]
+    private partial void LogParsingFailed(Exception exception, string sourceType);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Feed XML parsing failed for source {SourceType}. Keeping last successful items.")]
+    private partial void LogXmlParsingFailed(Exception exception, string sourceType);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Feed JSON parsing failed for source {SourceType}. Keeping last successful items.")]
+    private partial void LogJsonParsingFailed(Exception exception, string sourceType);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Feed data was invalid for source {SourceType}. Keeping last successful items.")]
+    private partial void LogInvalidData(Exception exception, string sourceType);
 
     private sealed record SourceCacheState(DateTimeOffset? LoadedAtUtc, IReadOnlyList<NewsItem> Items)
     {

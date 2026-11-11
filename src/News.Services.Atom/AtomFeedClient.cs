@@ -67,7 +67,7 @@ public sealed class AtomFeedClient(HttpClient httpClient, ILogger<AtomFeedClient
     /// YouTube states its like count as a media:starRating count, every vote being five stars.
     /// Other feeds use the element for an actual rating, so the like only follows from YouTube.
     /// </summary>
-    private static IReadOnlyDictionary<string, long>? ReadReactions(XElement entry, bool isYouTubeFeed)
+    private static Dictionary<string, long>? ReadReactions(XElement entry, bool isYouTubeFeed)
     {
         if (!isYouTubeFeed)
         {

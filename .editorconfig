@@ -1,0 +1,5 @@
+[tests/**.cs]
+# Test method names are descriptive sentences with underscores.
+dotnet_diagnostic.CA1707.severity = none
+# Test data is declared inline.
+dotnet_diagnostic.CA1861.severity = none

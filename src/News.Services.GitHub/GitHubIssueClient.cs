@@ -59,7 +59,7 @@ public sealed partial class GitHubIssueClient(HttpClient httpClient, ILogger<Git
             .Select(ToNewsItem)
             .ToList();
 
-        logger.LogDebug("Loaded {Count} items from {Url}", items.Count, url);
+        LogLoaded(items.Count, url);
         return items;
     }
 
@@ -127,4 +127,7 @@ public sealed partial class GitHubIssueClient(HttpClient httpClient, ILogger<Git
     [JsonSourceGenerationOptions(JsonSerializerDefaults.Web, PropertyNamingPolicy = JsonKnownNamingPolicy.SnakeCaseLower)]
     [JsonSerializable(typeof(List<Issue>))]
     private sealed partial class GitHubJsonContext : JsonSerializerContext;
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Loaded {Count} items from {Url}")]
+    private partial void LogLoaded(int count, string url);
 }

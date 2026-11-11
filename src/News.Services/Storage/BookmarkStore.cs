@@ -36,11 +36,11 @@ public sealed partial class BookmarkStore : IBookmarkStore
         }
         catch (IOException exception)
         {
-            _logger.LogWarning(exception, "Failed to read the bookmarks '{Name}'.", _name);
+            LogReadFailed(exception, _name);
         }
         catch (UnauthorizedAccessException exception)
         {
-            _logger.LogWarning(exception, "Not allowed to read the bookmarks '{Name}'.", _name);
+            LogReadNotAllowed(exception, _name);
         }
         catch (JsonException exception)
         {
@@ -48,7 +48,7 @@ public sealed partial class BookmarkStore : IBookmarkStore
             // back: whatever cannot be read here is the only copy of it. So it is set aside under
             // a name of its own rather than left to be written over, and can still be repaired
             // by hand.
-            _logger.LogWarning(exception, "Setting aside the unreadable bookmarks '{Name}'.", _name);
+            LogSettingAside(exception, _name);
             await TrySetAsideUnreadableAsync(cancellationToken);
         }
 
@@ -65,11 +65,11 @@ public sealed partial class BookmarkStore : IBookmarkStore
         }
         catch (IOException exception)
         {
-            _logger.LogWarning(exception, "Failed to store the bookmarks in '{Name}'.", _name);
+            LogStoreFailed(exception, _name);
         }
         catch (UnauthorizedAccessException exception)
         {
-            _logger.LogWarning(exception, "Not allowed to store the bookmarks in '{Name}'.", _name);
+            LogStoreNotAllowed(exception, _name);
         }
     }
 
@@ -97,20 +97,20 @@ public sealed partial class BookmarkStore : IBookmarkStore
                 cancellationToken);
             await blob.DeleteAsync(unreadable.Info.ConcurrencyToken, cancellationToken);
 
-            _logger.LogWarning("The unreadable bookmarks were set aside as '{Name}'.", setAsideName);
+            LogSetAside(setAsideName);
         }
         catch (IOException exception)
         {
-            _logger.LogWarning(exception, "Failed to set aside the unreadable bookmarks '{Name}'.", _name);
+            LogSetAsideFailed(exception, _name);
         }
         catch (UnauthorizedAccessException exception)
         {
-            _logger.LogWarning(exception, "Not allowed to set aside the unreadable bookmarks '{Name}'.", _name);
+            LogSetAsideNotAllowed(exception, _name);
         }
         catch (ConflictException exception)
         {
             // changed since it was read, so what was copied aside is no longer what is there
-            _logger.LogWarning(exception, "The unreadable bookmarks '{Name}' changed while being set aside.", _name);
+            LogSetAsideConflict(exception, _name);
         }
     }
 
@@ -124,4 +124,31 @@ public sealed partial class BookmarkStore : IBookmarkStore
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
     [JsonSerializable(typeof(BookmarkCollection))]
     private sealed partial class BookmarkStoreJsonContext : JsonSerializerContext;
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to read the bookmarks '{Name}'.")]
+    private partial void LogReadFailed(Exception exception, string name);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Not allowed to read the bookmarks '{Name}'.")]
+    private partial void LogReadNotAllowed(Exception exception, string name);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Setting aside the unreadable bookmarks '{Name}'.")]
+    private partial void LogSettingAside(Exception exception, string name);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to store the bookmarks in '{Name}'.")]
+    private partial void LogStoreFailed(Exception exception, string name);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Not allowed to store the bookmarks in '{Name}'.")]
+    private partial void LogStoreNotAllowed(Exception exception, string name);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "The unreadable bookmarks were set aside as '{Name}'.")]
+    private partial void LogSetAside(string name);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to set aside the unreadable bookmarks '{Name}'.")]
+    private partial void LogSetAsideFailed(Exception exception, string name);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Not allowed to set aside the unreadable bookmarks '{Name}'.")]
+    private partial void LogSetAsideNotAllowed(Exception exception, string name);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "The unreadable bookmarks '{Name}' changed while being set aside.")]
+    private partial void LogSetAsideConflict(Exception exception, string name);
 }

@@ -38,7 +38,7 @@ public static class ObservableListReconciler
     {
         var comparer = keyComparer ?? EqualityComparer<TKey>.Default;
 
-        var desiredKeys = new HashSet<TKey>(desired.Count, comparer);
+        HashSet<TKey> desiredKeys = [with(desired.Count, comparer)];
         foreach (var entry in desired)
         {
             if (!desiredKeys.Add(desiredKeySelector(entry)))

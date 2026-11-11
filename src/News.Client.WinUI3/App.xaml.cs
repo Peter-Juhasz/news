@@ -4,7 +4,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Media;
 using News.Bookmarks;
 using News.Client.WinUI3.Configuration;
 using News.Client.WinUI3.ViewModels;
@@ -26,10 +25,7 @@ public partial class App : Application
         InitializeComponent();
         _host = BuildHost();
         ApplyTheme();
-
-		// HACK: fix for sluggish UI on Windows 11, see https://github.com/microsoft/microsoft-ui-xaml/issues/11144
-		CompositionTarget.Rendering += (_, _) => { };
-	}
+    }
 
     /// <summary>
     /// Puts the configured theme on the application rather than on the window's content.
